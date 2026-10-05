@@ -694,7 +694,7 @@ function openSession(id){
   var wk=p?p.workouts.find(function(w){return w.id===ses.workoutId}):null;
   var exs=wk?wk.exercises:[];
   var first=exs.find(function(e){return !(ses.entries[e.id]&&ses.entries[e.id].sets.length)})||exs[0];
-  openEx=first?first.id:null;
+  openEx=(first&&!ses.done)?first.id:null;
   if(openEx) initDraft(ses,openEx);
   nav.push({t:'session',id:id});
   render(); toTop();
@@ -818,7 +818,7 @@ var A={
     var s=curSes(); if(!s) return;
     if(!confirm('Удалить эту тренировку?')) return;
     S.sessions=S.sessions.filter(function(x){return x.id!==s.id});
-    save(); nav=[{t:'home'}]; render(); toTop();
+    save(); if(s.done&&nav.length>1) nav.pop(); else nav=[{t:'home'}]; render(); toTop();
   },
 
   openex:function(d){
