@@ -139,12 +139,12 @@ button{touch-action:manipulation;cursor:pointer;-webkit-user-select:none;user-se
 .hrow .n{color:var(--muted);font-size:15px}
 .exedit .rowx{display:flex;align-items:center;gap:8px}
 .exedit .rowx label{flex:1;color:var(--muted);font-size:14px;display:flex;align-items:center;gap:8px}
-.exedit .rowx input{width:80px;height:48px;border:0;border-radius:12px;background:var(--card2);text-align:center;font-size:18px;outline:none}
+.exedit .rowx input{width:68px;flex:none;height:48px;border:0;border-radius:12px;background:var(--card2);text-align:center;font-size:18px;outline:none}
 .exedit .btn.sm{min-width:48px;padding:0}
 .exedit .seg{background:var(--bg);margin:0 0 10px}
 .exedit .seg .on{background:var(--card2);color:var(--accent)}
-.exedit .rowx .btn.mv{flex:1;font-size:16px}
-.exedit .rowx .btn.danger{flex:0 0 56px}
+.exedit .rowx{gap:6px}
+.exedit .rowx .btn.mv{flex:0 0 44px;width:44px;min-width:44px;min-height:48px;padding:0;font-size:22px}
 .btn:disabled{opacity:.3;pointer-events:none}
 .stepper.t{grid-template-columns:64px minmax(0,1fr) 64px}
 .stepper.t .btn{font-size:34px}
@@ -706,10 +706,10 @@ function vWedit(v){
     var tm=exType(ex)==='t', n=w.exercises.length;
     h+='<div class="card exedit"><input class="text" data-in="exname" data-id="'+ex.id+'" value="'+esc(ex.name)+'" placeholder="Название упражнения">'+
        '<div class="seg"><button class="'+(tm?'':'on')+'" data-a="extype" data-id="'+ex.id+'" data-v="w">Вес × повторы</button><button class="'+(tm?'on':'')+'" data-a="extype" data-id="'+ex.id+'" data-v="t">Время</button></div>'+
-       '<div class="rowx"><label>'+(tm?'Шаг времени, с':'Шаг веса, кг')+' <input data-in="exstep" data-id="'+ex.id+'" inputmode="decimal" value="'+(tm?(ex.tstep||30):num(ex.step||2.5))+'"></label></div>'+
-       '<div class="rowx" style="margin-top:10px"><button class="btn sm mv" data-a="exup" data-id="'+ex.id+'"'+(i===0?' disabled':'')+'>↑ Выше</button>'+
-       '<button class="btn sm mv" data-a="exdown" data-id="'+ex.id+'"'+(i===n-1?' disabled':'')+'>↓ Ниже</button>'+
-       '<button class="btn sm danger" data-a="exdel" data-id="'+ex.id+'" aria-label="Удалить">✕</button></div></div>';
+       '<div class="rowx"><label>'+(tm?'Шаг времени, с':'Шаг веса, кг')+' <input data-in="exstep" data-id="'+ex.id+'" inputmode="decimal" value="'+(tm?(ex.tstep||30):num(ex.step||2.5))+'"></label>'+
+       '<button class="btn sm mv" data-a="exup" data-id="'+ex.id+'"'+(i===0?' disabled':'')+' aria-label="Выше">↑</button>'+
+       '<button class="btn sm mv" data-a="exdown" data-id="'+ex.id+'"'+(i===n-1?' disabled':'')+' aria-label="Ниже">↓</button>'+
+       '<button class="btn sm danger mv" data-a="exdel" data-id="'+ex.id+'" aria-label="Удалить">✕</button></div></div>';
   });
   h+='<button class="btn" data-a="exadd">+ Добавить упражнение</button><button class="btn danger" style="margin-top:12px" data-a="wdel">Удалить тренировку</button>';
   return h;
@@ -1163,8 +1163,10 @@ var A={
     if(sim&&!confirm('Похоже на «'+sim.name+'», оно уже есть в базе. Всё равно создать новое «'+q+'»?')) return;
     var l=createLib(q,d.tp);
     if(v.t==='expick'){var w=wkOf(v); if(w) w.exercises.push(mkEx(l));}
-    save(); exq=''; var inp=document.getElementById('exq'); if(inp) inp.value='';
-    refreshPick(); toast(v.t==='expick'?'Создано и добавлено':'Создано');
+    save(); exq='';
+    if(v.t==='expick'){ nav.pop(); render(); toTop(); toast('Создано и добавлено'); return; }
+    var inp=document.getElementById('exq'); if(inp) inp.value='';
+    refreshPick(); toast('Создано');
   },
   extype:function(d){
     var e=exById(d.id); if(!e) return;
