@@ -141,6 +141,21 @@ button{touch-action:manipulation;cursor:pointer;-webkit-user-select:none;user-se
 .exedit .rowx label{flex:1;color:var(--muted);font-size:14px;display:flex;align-items:center;gap:8px}
 .exedit .rowx input{width:80px;height:48px;border:0;border-radius:12px;background:var(--card2);text-align:center;font-size:18px;outline:none}
 .exedit .btn.sm{min-width:48px;padding:0}
+.exedit .seg{background:var(--bg);margin:0 0 10px}
+.exedit .seg .on{background:var(--card2);color:var(--accent)}
+.exedit .rowx .btn.mv{flex:1;font-size:16px}
+.exedit .rowx .btn.danger{flex:0 0 56px}
+.btn:disabled{opacity:.3;pointer-events:none}
+.stepper.t{grid-template-columns:64px minmax(0,1fr) 64px}
+.stepper.t .btn{font-size:34px}
+.tin{display:flex;align-items:center;gap:4px;min-width:0;height:76px;border-radius:16px;background:var(--card2);padding:0 6px}
+.tin label{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center}
+.tin input{width:100%;min-width:0;height:46px;border:0;background:transparent;text-align:center;font-size:clamp(28px,8.5vw,36px);font-weight:700;outline:none;border-radius:10px;padding:0}
+.tin input:focus{box-shadow:inset 0 0 0 2px var(--accent)}
+.tin small{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;line-height:1;margin-top:-2px}
+.tin b{font-size:30px;color:var(--muted);padding-bottom:12px}
+.hint{color:var(--amber);font-size:15px;margin:4px 4px 10px}
+.inw{color:var(--accent);font-weight:700}
 
 #toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#fff;color:#000;padding:10px 16px;border-radius:12px;font-weight:600;opacity:0;pointer-events:none;transition:opacity .2s;z-index:20;white-space:nowrap}
 #toast.on{opacity:1}
@@ -162,6 +177,7 @@ button{touch-action:manipulation;cursor:pointer;-webkit-user-select:none;user-se
 
 /* ---------- helpers ---------- */
 var KEY='gymlog.v1';
+function exType(ex){return ex&&ex.type==='t'?'t':'w'}
 var uid=function(){return Math.random().toString(36).slice(2,9)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var num=function(n){return String(Math.round(n*100)/100).replace('.',',')};
@@ -175,17 +191,24 @@ var fmtDate=function(d){
 };
 var mmss=function(s){return Math.floor(s/60)+':'+pad(s%60)};
 var norm=function(s){return String(s||'').trim().toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ')};
+var fmtT=function(sec){
+  sec=Math.max(0,Math.round(sec)); var m=Math.floor(sec/60), r=sec%60;
+  if(!m) return r+' с';
+  return r?m+' мин '+r+' с':m+' мин';
+};
+var setLbl=function(x){return x.s!=null?fmtT(x.s):num(x.w)+'×'+x.r};
 function fmtSets(sets){
   var g=[];
-  sets.forEach(function(s){
+  sets.forEach(function(x){
     var l=g[g.length-1];
-    if(l&&l.w===s.w) l.r.push(s.r); else g.push({w:s.w,r:[s.r]});
+    if(x.s!=null){ if(l&&l.t) l.r.push(fmtT(x.s)); else g.push({t:1,r:[fmtT(x.s)]}); return; }
+    if(l&&!l.t&&l.w===x.w) l.r.push(x.r); else g.push({w:x.w,r:[x.r]});
   });
-  return g.map(function(x){return num(x.w)+'×'+x.r.join('-')}).join('; ');
+  return g.map(function(x){return x.t?x.r.join(', '):num(x.w)+'×'+x.r.join('-')}).join('; ');
 }
 
 /* ---------- data ---------- */
-function empty(){return {v:2,programs:[],sessions:[],settings:{rest:90}};}
+function empty(){return {v:2,programs:[],sessions:[],settings:{rest:90},lib:[]};}
 function valid(d){return d&&Array.isArray(d.sessions)&&(Array.isArray(d.programs)||Array.isArray(d.workouts))}
 // старый формат (без программ) -> одна программа «Моя программа» со всеми тренировками
 function migrate(d){
@@ -205,7 +228,7 @@ function load(){
     var r=localStorage.getItem(KEY);
     if(r){
       var d=JSON.parse(r);
-      if(valid(d)){d=migrate(d);d.settings=d.settings||{rest:90};return d;}
+      if(valid(d)){d=migrate(d);d.settings=d.settings||{rest:90};syncLib(d);return d;}
     }
   }catch(e){}
   return empty();
@@ -213,6 +236,98 @@ function load(){
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 var S=load();
 save();
+
+/* ---------- база упражнений ---------- */
+
+var libFind=function(name){var n=norm(name);return S.lib.find(function(l){return norm(l.name)===n})};
+// в базе должны быть все упражнения из программ и истории (по названию без учёта регистра и пробелов)
+function syncLib(d){
+  d.lib=Array.isArray(d.lib)?d.lib:[];
+  var have=Object.create(null);
+  d.lib.forEach(function(l){have[norm(l.name)]=l});
+  function add(name,ex,sets){
+    var n=norm(name); if(!n||have[n]) return;
+    var tp=ex?exType(ex):((sets||[]).some(function(x){return x.s!=null})?'t':'w');
+    var l={id:uid(),name:String(name).trim().replace(/\s+/g,' '),type:tp,step:(ex&&ex.step)||2.5,tstep:(ex&&ex.tstep)||30};
+    d.lib.push(l); have[n]=l;
+  }
+  d.programs.forEach(function(p){p.workouts.forEach(function(w){w.exercises.forEach(function(e){add(e.name,e)})})});
+  d.sessions.forEach(function(s){Object.keys(s.entries||{}).forEach(function(k){var e=s.entries[k];if(e&&e.sets&&e.sets.length)add(e.name,null,e.sets)})});
+}
+syncLib(S); save();
+function createLib(name,tp){
+  var l={id:uid(),name:name,type:tp==='t'?'t':'w',step:2.5,tstep:30};
+  S.lib.push(l); return l;
+}
+var mkEx=function(l){return {id:uid(),name:l.name,step:l.step||2.5,tstep:l.tstep||30,type:exType(l)}};
+function eachEx(f){S.programs.forEach(function(p){p.workouts.forEach(function(w){w.exercises.forEach(f)})})}
+// настройки (тип, шаг) одинаковы у всех упражнений с таким названием
+function applyProps(name,props){
+  var n=norm(name), l=libFind(name);
+  if(l) Object.keys(props).forEach(function(k){l[k]=props[k]});
+  eachEx(function(e){if(norm(e.name)===n) Object.keys(props).forEach(function(k){e[k]=props[k]})});
+}
+function renameEverywhere(on,nn){
+  eachEx(function(e){if(norm(e.name)===on)e.name=nn});
+  S.sessions.forEach(function(s){Object.keys(s.entries).forEach(function(k){var e=s.entries[k];if(norm(e.name)===on)e.name=nn})});
+}
+// переименование = во всей базе и истории; если такое имя уже есть — объединение. Возвращает итоговую запись базы.
+function renameEx(oldName,val){
+  var nn=String(val||'').trim().replace(/\s+/g,' ');
+  if(!nn||nn===oldName) return null;
+  syncLib(S);
+  var on=norm(oldName), lib=libFind(oldName);
+  var other=S.lib.find(function(l){return l!==lib&&norm(l.name)===norm(nn)});
+  if(other){
+    if(!confirm('«'+other.name+'» уже есть в базе. Объединить «'+oldName+'» с ним? История по обоим станет общей.')) return null;
+    S.lib=S.lib.filter(function(l){return l!==lib});
+    renameEverywhere(on,other.name);
+    applyProps(other.name,{type:exType(other),step:other.step||2.5,tstep:other.tstep||30});
+    save(); return other;
+  }
+  if(lib) lib.name=nn;
+  renameEverywhere(on,nn);
+  save(); return lib||libFind(nn);
+}
+function libStats(){
+  var m=Object.create(null);
+  S.sessions.forEach(function(s){Object.keys(s.entries).forEach(function(k){
+    var e=s.entries[k]; if(!e.sets.length) return;
+    var n=norm(e.name), x=m[n]||(m[n]={last:0,count:0});
+    x.count++; if(s.ts>x.last) x.last=s.ts;
+  })});
+  return m;
+}
+function libUse(l){
+  var n=norm(l.name), pr=0;
+  eachEx(function(e){if(norm(e.name)===n)pr++});
+  var st=libStats()[n];
+  return {progs:pr,sess:st?st.count:0};
+}
+function lev(a,b){
+  var d=[],i,j;
+  for(i=0;i<=a.length;i++){d[i]=[i];}
+  for(j=1;j<=b.length;j++) d[0][j]=j;
+  for(i=1;i<=a.length;i++) for(j=1;j<=b.length;j++)
+    d[i][j]=Math.min(d[i-1][j]+1,d[i][j-1]+1,d[i-1][j-1]+(a[i-1]===b[j-1]?0:1));
+  return d[a.length][b.length];
+}
+// похожие названия: «жим лежа» ~ «Жим штанги лёжа», «присед» ~ «приседания», опечатки
+function simil(a,b){
+  a=norm(a); b=norm(b);
+  if(!a||!b) return false;
+  if(a===b) return true;
+  var ca=a.replace(/[^a-zа-я0-9]/g,''), cb=b.replace(/[^a-zа-я0-9]/g,'');
+  if(ca===cb) return true;
+  if(ca.length>=3&&cb.length>=3&&(ca.indexOf(cb)>=0||cb.indexOf(ca)>=0)) return true;
+  var ta=a.split(' '), tb=b.split(' ');
+  var sh=ta.length<=tb.length?ta:tb, lg=ta.length<=tb.length?tb:ta;
+  if(sh.length>=2||lg.length>=2){
+    var all=sh.every(function(x){return lg.some(function(y){return x===y||(x.length>=4&&y.length>=4&&x.slice(0,4)===y.slice(0,4))})});
+    if(all&&sh.length>=1&&(sh.length>=2||sh[0].length>=4)) return true;
+  }
+  return lev(ca,cb)<=(Math.max(ca.length,cb.length)>=8?2:1);
+}
 
 var sessionsSorted=function(){return S.sessions.slice().sort(function(a,b){return a.ts-b.ts})};
 var progById=function(id){return S.programs.find(function(p){return p.id===id})};
@@ -272,7 +387,8 @@ var nav=[{t:'home'}];
 var cur=function(){return nav[nav.length-1]};
 var hseg='s';
 var openEx=null;
-var draft={exId:null,w:0,r:10,idx:null};
+var draft={exId:null,w:0,r:10,s:60,idx:null};
+var exq='';
 var modal=null;
 var curSes=function(){var v=cur();return v.t==='session'?S.sessions.find(function(s){return s.id===v.id}):null};
 
@@ -325,14 +441,15 @@ function modalHtml(){
 }
 
 function initDraft(ses,exId){
-  var ent=ses.entries[exId], w=0, r=10;
+  var ex=exById(exId), tm=exType(ex)==='t', ent=ses.entries[exId], w=0, r=10, sc=60;
   if(ent&&ent.sets.length){
-    var l=ent.sets[ent.sets.length-1]; w=l.w; r=l.r;
+    var l=ent.sets[ent.sets.length-1]; w=l.w; r=l.r; if(l.s!=null) sc=l.s;
   } else {
     var p=prevEntry(exId,ses);
-    if(p){w=p.e.sets[0].w; r=p.e.sets[0].r;}
+    if(p){var f=p.e.sets[0]; w=f.w; r=f.r; if(f.s!=null) sc=f.s;}
   }
-  draft={exId:exId,w:w,r:r,idx:null};
+  if(!tm&&!r) r=10;
+  draft={exId:exId,w:w,r:r,s:sc,idx:null};
 }
 
 /* ---------- views ---------- */
@@ -425,21 +542,30 @@ function exBody(ses,ex){
   var ent=ses.entries[ex.id]||{sets:[],note:''};
   var prev=prevEntry(ex.id,ses), d=draft, editing=d.idx!==null;
   var chips=ent.sets.map(function(s,i){
-    return '<button class="chip'+(d.idx===i?' sel':'')+'" data-a="selset" data-i="'+i+'">'+(i+1)+'. '+num(s.w)+'×'+s.r+'</button>';
+    return '<button class="chip'+(d.idx===i?' sel':'')+'" data-a="selset" data-i="'+i+'">'+(i+1)+'. '+setLbl(s)+'</button>';
   }).join('');
   var h='<div class="exbody">';
   h+= prev
     ? '<div class="prev">Прошлый раз'+(prev.date?' ('+fmtDate(prev.date)+')':'')+': <b>'+esc(fmtSets(prev.e.sets))+'</b>'+(prev.e.note?' · '+esc(prev.e.note):'')+'</div>'
     : '<div class="prev">Пока нет истории по этому упражнению</div>';
   if(chips) h+='<div class="chips">'+chips+'</div>';
-  h+='<div class="lbl">Вес, кг</div><div class="stepper">'+
-     '<button class="btn" data-a="step" data-k="w" data-d="-1">−</button>'+
-     '<input id="in-w" data-in="w" inputmode="decimal" value="'+num(parseNum(d.w))+'">'+
-     '<button class="btn" data-a="step" data-k="w" data-d="1">+</button></div>';
-  h+='<div class="lbl">Повторы</div><div class="stepper">'+
-     '<button class="btn" data-a="step" data-k="r" data-d="-1">−</button>'+
-     '<input id="in-r" data-in="r" inputmode="numeric" value="'+num(parseNum(d.r))+'">'+
-     '<button class="btn" data-a="step" data-k="r" data-d="1">+</button></div>';
+  if(exType(ex)==='t'){
+    var sc=Math.max(0,Math.round(parseNum(d.s)));
+    h+='<div class="lbl">Время</div><div class="stepper t">'+
+       '<button class="btn" data-a="step" data-k="s" data-d="-1">−</button>'+
+       '<div class="tin"><label><input id="in-tm" data-in="tm" inputmode="numeric" value="'+Math.floor(sc/60)+'"><small>мин</small></label><b>:</b>'+
+       '<label><input id="in-ts" data-in="ts" inputmode="numeric" value="'+pad(sc%60)+'"><small>сек</small></label></div>'+
+       '<button class="btn" data-a="step" data-k="s" data-d="1">+</button></div>';
+  } else {
+    h+='<div class="lbl">Вес, кг</div><div class="stepper">'+
+       '<button class="btn" data-a="step" data-k="w" data-d="-1">−</button>'+
+       '<input id="in-w" data-in="w" inputmode="decimal" value="'+num(parseNum(d.w))+'">'+
+       '<button class="btn" data-a="step" data-k="w" data-d="1">+</button></div>';
+    h+='<div class="lbl">Повторы</div><div class="stepper">'+
+       '<button class="btn" data-a="step" data-k="r" data-d="-1">−</button>'+
+       '<input id="in-r" data-in="r" inputmode="numeric" value="'+num(parseNum(d.r))+'">'+
+       '<button class="btn" data-a="step" data-k="r" data-d="1">+</button></div>';
+  }
   if(editing){
     h+='<button class="btn primary big" data-a="log">Сохранить подход '+(d.idx+1)+'</button>';
   } else if(ent.sets.length){
@@ -534,8 +660,11 @@ function vEx(v){
   });
   var h=head(name);
   if(!rows.length) return h+'<div class="small">По этому упражнению пока нет записей.</div>';
-  var tops=rows.map(function(r){return Math.max.apply(null,r.e.sets.map(function(x){return x.w}))});
-  h+='<div class="card"><div class="small nm">Максимальный вес по тренировкам</div><div class="title">'+num(Math.max.apply(null,tops))+' кг <span class="small nm" style="font-weight:400">рекорд</span></div>'+chart(tops)+'</div>';
+  var isT=function(r){return r.e.sets.some(function(x){return x.s!=null})};
+  var kT=isT(rows[rows.length-1]);
+  var tops=rows.filter(function(r){return isT(r)===kT}).map(function(r){return Math.max.apply(null,r.e.sets.map(function(x){return kT?(x.s||0):x.w}))});
+  var best=Math.max.apply(null,tops);
+  h+='<div class="card"><div class="small nm">'+(kT?'Максимальное время по тренировкам':'Максимальный вес по тренировкам')+'</div><div class="title">'+(kT?fmtT(best):num(best)+' кг')+' <span class="small nm" style="font-weight:400">рекорд</span></div>'+chart(tops)+'</div>';
   h+='<div class="card">';
   rows.slice().reverse().forEach(function(r){
     var p=progById(r.s.programId);
@@ -549,6 +678,8 @@ function vMore(){
   '<div class="card"><div class="title">Таймер отдыха</div><div class="small">Запускается после каждого подхода</div><div class="stepper">'+
     '<button class="btn" data-a="restset" data-d="-15">−</button><input readonly value="'+S.settings.rest+' с" style="font-size:30px"><button class="btn" data-a="restset" data-d="15">+</button></div>'+
     '<button class="trow" data-a="track"><span><span class="tl">Отслеживать отдых</span><span class="td">После таймера появится кнопка «Начать подход». В конце тренировки — время подходов и отдыха.</span></span><span class="sw'+(S.settings.track?' on':'')+'"><i></i></span></button></div>'+
+  '<div class="card"><div class="title">Упражнения</div><div class="small">Общая база: выбор при добавлении, переименование, объединение дублей.</div>'+
+    '<button class="btn" '+goAttr({t:'exlib'})+'>База упражнений · '+S.lib.length+'</button></div>'+
   '<div class="card"><div class="title">Резервная копия</div><div class="small">Данные хранятся только на этом телефоне. Время от времени сохраняйте копию (например, в «Файлы» или себе в мессенджер).</div>'+
     '<div class="row2" style="margin-top:0"><button class="btn" data-a="export">Сохранить</button><button class="btn" data-a="import">Загрузить</button></div></div>';
 }
@@ -571,13 +702,75 @@ function vWedit(v){
   if(!w) return bail();
   var h=head('Тренировка');
   h+='<input class="text" data-in="wname" value="'+esc(w.name)+'" placeholder="Название">';
-  w.exercises.forEach(function(ex){
+  w.exercises.forEach(function(ex,i){
+    var tm=exType(ex)==='t', n=w.exercises.length;
     h+='<div class="card exedit"><input class="text" data-in="exname" data-id="'+ex.id+'" value="'+esc(ex.name)+'" placeholder="Название упражнения">'+
-       '<div class="rowx"><label>Шаг веса, кг <input data-in="exstep" data-id="'+ex.id+'" inputmode="decimal" value="'+num(ex.step||2.5)+'"></label>'+
-       '<button class="btn sm" data-a="exup" data-id="'+ex.id+'">↑</button><button class="btn sm" data-a="exdown" data-id="'+ex.id+'">↓</button>'+
-       '<button class="btn sm danger" data-a="exdel" data-id="'+ex.id+'">✕</button></div></div>';
+       '<div class="seg"><button class="'+(tm?'':'on')+'" data-a="extype" data-id="'+ex.id+'" data-v="w">Вес × повторы</button><button class="'+(tm?'on':'')+'" data-a="extype" data-id="'+ex.id+'" data-v="t">Время</button></div>'+
+       '<div class="rowx"><label>'+(tm?'Шаг времени, с':'Шаг веса, кг')+' <input data-in="exstep" data-id="'+ex.id+'" inputmode="decimal" value="'+(tm?(ex.tstep||30):num(ex.step||2.5))+'"></label></div>'+
+       '<div class="rowx" style="margin-top:10px"><button class="btn sm mv" data-a="exup" data-id="'+ex.id+'"'+(i===0?' disabled':'')+'>↑ Выше</button>'+
+       '<button class="btn sm mv" data-a="exdown" data-id="'+ex.id+'"'+(i===n-1?' disabled':'')+'>↓ Ниже</button>'+
+       '<button class="btn sm danger" data-a="exdel" data-id="'+ex.id+'" aria-label="Удалить">✕</button></div></div>';
   });
   h+='<button class="btn" data-a="exadd">+ Добавить упражнение</button><button class="btn danger" style="margin-top:12px" data-a="wdel">Удалить тренировку</button>';
+  return h;
+}
+
+/* выбор из базы / список базы */
+function pickBody(v){
+  var pick=v.t==='expick', w=pick?wkOf(v):null;
+  var q=exq.trim().replace(/\s+/g,' '), nq=norm(q), st=libStats(), exact=null, h='';
+  var cmp=function(a,b){
+    var x=(st[norm(a.name)]||{last:0}).last, y=(st[norm(b.name)]||{last:0}).last;
+    return (y-x)||a.name.localeCompare(b.name,'ru');
+  };
+  var lst, sims=[];
+  if(nq){
+    var a1=[],b1=[];
+    S.lib.forEach(function(l){
+      var n=norm(l.name); if(n===nq) exact=l;
+      if(n.indexOf(nq)>=0) a1.push(l); else if(simil(l.name,q)) b1.push(l);
+    });
+    a1.sort(cmp); b1.sort(cmp); sims=b1; lst=a1.concat(b1);
+  } else lst=S.lib.slice().sort(cmp);
+  var inW=function(l){return w&&w.exercises.some(function(e){return norm(e.name)===norm(l.name)})};
+  if(nq&&sims.length&&!exact) h+='<div class="hint">Похоже на то, что уже есть в базе. Выберите из списка, чтобы не плодить дубли.</div>';
+  if(lst.length){
+    h+='<div class="gh">'+(nq?'Найдено в базе':'База упражнений')+'</div>';
+    lst.forEach(function(l){
+      var stt=st[norm(l.name)], info=(exType(l)==='t'?'время':'вес × повторы')+(stt?' · тренировок: '+stt.count:'');
+      var attr=pick?'data-a="pickadd" data-id="'+l.id+'"':goAttr({t:'exitem',id:l.id});
+      h+='<button class="item" '+attr+'><div class="title" style="font-size:19px">'+esc(l.name)+'</div><div class="small">'+info+(pick&&inW(l)?' · <span class="inw">✓ в тренировке</span>':'')+'</div></button>';
+    });
+  } else if(!nq){
+    h+='<div class="small">База пока пуста. Введите название выше и создайте первое упражнение.</div>';
+  }
+  if(nq&&!exact){
+    h+='<div class="gh">Создать новое «'+esc(q)+'»</div>'+
+       '<div class="row2" style="margin-top:0"><button class="btn" data-a="newex" data-tp="w">Вес × повторы</button><button class="btn" data-a="newex" data-tp="t">Время</button></div>';
+  } else if(nq&&exact&&!lst.length){ h+=''; }
+  return h;
+}
+function refreshPick(){var el=document.getElementById('exlist');if(el)el.innerHTML=pickBody(cur());}
+function vPick(v){
+  var pick=v.t==='expick';
+  if(pick&&!wkOf(v)) return bail();
+  return head(pick?'Добавить упражнение':'База упражнений')+
+    '<input class="text" id="exq" data-in="exq" autocomplete="off" placeholder="Поиск или название нового" value="'+esc(exq)+'">'+
+    '<div id="exlist">'+pickBody(v)+'</div>';
+}
+function vExItem(v){
+  var l=S.lib.find(function(x){return x.id===v.id});
+  if(!l) return bail();
+  var tm=exType(l)==='t', use=libUse(l);
+  var h=head('Упражнение');
+  h+='<input class="text" data-in="libname" value="'+esc(l.name)+'" placeholder="Название">';
+  h+='<div class="small">Переименование меняет название везде: в программах и в истории. Если такое название уже есть, упражнения объединятся.</div>';
+  h+='<div class="card exedit"><div class="seg"><button class="'+(tm?'':'on')+'" data-a="libtype" data-v="w">Вес × повторы</button><button class="'+(tm?'on':'')+'" data-a="libtype" data-v="t">Время</button></div>'+
+     '<div class="rowx"><label>'+(tm?'Шаг времени, с':'Шаг веса, кг')+' <input data-in="libstep" inputmode="decimal" value="'+(tm?(l.tstep||30):num(l.step||2.5))+'"></label></div></div>';
+  h+='<div class="card"><div class="small nm">В программах: '+use.progs+' · в истории: '+use.sess+' тренировок</div></div>';
+  h+=(use.progs||use.sess)
+    ? '<div class="small">Удалить можно только неиспользуемое упражнение. Дубль лучше объединить: переименуйте его в название основного.</div>'
+    : '<button class="btn danger" data-a="libdel">Удалить из базы</button>';
   return h;
 }
 
@@ -591,6 +784,8 @@ function viewFor(v){
     case 'ex': return vEx(v);
     case 'pedit': return vPedit(v);
     case 'wedit': return vWedit(v);
+    case 'expick': case 'exlib': return vPick(v);
+    case 'exitem': return vExItem(v);
   }
   return vHome();
 }
@@ -732,9 +927,9 @@ function exportData(){
 
 /* ---------- actions ---------- */
 var A={
-  tab:function(d){nav=[{t:d.t}];render();toTop();},
-  go:function(d){nav.push(JSON.parse(d.v));render();toTop();},
-  back:function(){if(nav.length>1)nav.pop();render();toTop();},
+  tab:function(d){exq='';nav=[{t:d.t}];render();toTop();},
+  go:function(d){exq='';nav.push(JSON.parse(d.v));render();toTop();},
+  back:function(){exq='';if(nav.length>1)nav.pop();render();toTop();},
   hseg:function(d){hseg=d.v;render();},
 
   // программы
@@ -766,7 +961,7 @@ var A={
     S.programs.push({
       id:id,name:p.name,current:true,originId:origin,run:run,createdTs:Date.now(),
       workouts:p.workouts.map(function(w){
-        return {id:uid(),name:w.name,exercises:w.exercises.map(function(e){return {id:uid(),name:e.name,step:e.step}})};
+        return {id:uid(),name:w.name,exercises:w.exercises.map(function(e){return {id:uid(),name:e.name,step:e.step,tstep:e.tstep,type:e.type}})};
       })
     });
     save();
@@ -831,6 +1026,14 @@ var A={
   },
   step:function(d){
     var ex=exById(draft.exId), k=d.k;
+    if(k==='s'){
+      var ns2=Math.max(0,Math.round(parseNum(draft.s)+(+d.d)*((ex&&ex.tstep)||30)));
+      draft.s=ns2;
+      var im=document.getElementById('in-tm'), is=document.getElementById('in-ts');
+      if(im) im.value=Math.floor(ns2/60);
+      if(is) is.value=pad(ns2%60);
+      return;
+    }
     var st=k==='w'?((ex&&ex.step)||2.5):1;
     var nv=Math.max(0,Math.round((parseNum(draft[k])+(+d.d)*st)*100)/100);
     draft[k]=nv;
@@ -840,7 +1043,7 @@ var A={
   selset:function(d){
     var s=curSes(); if(!s||!s.entries[draft.exId]) return;
     var i=+d.i, st=s.entries[draft.exId].sets[i]; if(!st) return;
-    draft.idx=i; draft.w=st.w; draft.r=st.r; render();
+    draft.idx=i; draft.w=st.w; draft.r=st.r; if(st.s!=null) draft.s=st.s; render();
   },
   cancelset:function(){var s=curSes();if(s)initDraft(s,draft.exId);render();},
   delset:function(){
@@ -852,19 +1055,22 @@ var A={
   log:function(){
     unlockAudio();
     var s=curSes(); if(!s||!draft.exId) return;
-    var r=Math.round(parseNum(draft.r)), w=parseNum(draft.w);
-    if(r<=0){toast('Укажите повторы');return;}
-    var ex=exById(draft.exId), now=Date.now();
+    var ex=exById(draft.exId), now=Date.now(), tm=exType(ex)==='t';
+    var r=Math.round(parseNum(draft.r)), w=parseNum(draft.w), sc=Math.round(parseNum(draft.s));
+    if(tm){ if(sc<=0){toast('Укажите время');return;} r=0; w=0; }
+    else if(r<=0){toast('Укажите повторы');return;}
     var ent=s.entries[draft.exId]||(s.entries[draft.exId]={sets:[],note:''});
     ent.name=ex?ex.name:(ent.name||'');
     if(draft.idx!==null){
       // правка подхода: замеры времени остаются прежними
       var o=ent.sets[draft.idx]||{}, ns={w:w,r:r,t:o.t||now};
+      if(tm) ns.s=sc;
       if(o.dur!=null) ns.dur=o.dur;
       if(o.rest!=null){ns.rest=o.rest;ns.rk=o.rk;}
       ent.sets[draft.idx]=ns; draft.idx=null;
     } else {
       var set={w:w,r:r,t:now};
+      if(tm) set.s=sc;
       if(!s.done){
         var rt=s.rt||{}, tr=!!S.settings.track;
         if(!s.t0) s.t0=(tr&&rt.start)?rt.start:now;   // старт тренировки — с первого подхода
@@ -880,7 +1086,7 @@ var A={
       }
       ent.sets.push(set);
     }
-    draft.w=w; draft.r=r;
+    if(tm) draft.s=sc; else {draft.w=w; draft.r=r;}
     save(); render();
   },
   setstart:function(){
@@ -940,10 +1146,39 @@ var A={
     nav.push({t:'wedit',p:p.id,id:w.id}); render(); toTop();
   },
   exadd:function(){
-    var w=wkOf(cur()); if(!w) return;
-    var name=prompt('Название упражнения','');
-    if(!name||!name.trim()) return;
-    w.exercises.push({id:uid(),name:name.trim(),step:2.5}); save(); render();
+    var v=cur(); if(!wkOf(v)) return;
+    exq=''; nav.push({t:'expick',p:v.p,id:v.id}); render(); toTop();
+  },
+  pickadd:function(d){
+    var v=cur(), w=wkOf(v), l=S.lib.find(function(x){return x.id===d.id});
+    if(!w||!l) return;
+    if(w.exercises.some(function(e){return norm(e.name)===norm(l.name)})){toast('Уже есть в этой тренировке');return;}
+    w.exercises.push(mkEx(l)); save(); refreshPick(); toast('Добавлено: '+l.name);
+  },
+  newex:function(d){
+    var v=cur(), q=exq.trim().replace(/\s+/g,' ');
+    if(!q) return;
+    if(libFind(q)){toast('Такое уже есть в базе');return;}
+    var sim=S.lib.find(function(l){return simil(l.name,q)});
+    if(sim&&!confirm('Похоже на «'+sim.name+'», оно уже есть в базе. Всё равно создать новое «'+q+'»?')) return;
+    var l=createLib(q,d.tp);
+    if(v.t==='expick'){var w=wkOf(v); if(w) w.exercises.push(mkEx(l));}
+    save(); exq=''; var inp=document.getElementById('exq'); if(inp) inp.value='';
+    refreshPick(); toast(v.t==='expick'?'Создано и добавлено':'Создано');
+  },
+  extype:function(d){
+    var e=exById(d.id); if(!e) return;
+    applyProps(e.name,{type:d.v==='t'?'t':'w'}); save(); render();
+  },
+  libtype:function(d){
+    var l=S.lib.find(function(x){return x.id===cur().id}); if(!l) return;
+    applyProps(l.name,{type:d.v==='t'?'t':'w'}); save(); render();
+  },
+  libdel:function(){
+    var l=S.lib.find(function(x){return x.id===cur().id}); if(!l) return;
+    var u=libUse(l); if(u.progs||u.sess) return;
+    if(!confirm('Удалить «'+l.name+'» из базы?')) return;
+    S.lib=S.lib.filter(function(x){return x!==l}); save(); nav.pop(); render(); toTop();
   },
   exup:function(d){moveEx(d.id,-1);},
   exdown:function(d){moveEx(d.id,1);},
@@ -975,6 +1210,15 @@ document.addEventListener('click',function(e){
   if(f) f(t.dataset,t);
 });
 
+function timeFromInputs(){
+  var a=document.getElementById('in-tm'), b=document.getElementById('in-ts');
+  draft.s=Math.max(0,(parseInt(a&&a.value,10)||0)*60+(parseInt(b&&b.value,10)||0));
+}
+function setStep(name,tm,val){
+  if(tm) applyProps(name,{tstep:Math.max(5,Math.round(parseNum(val))||30)});
+  else applyProps(name,{step:Math.max(0.25,parseNum(val)||2.5)});
+  save();
+}
 var onInput={
   w:function(t){draft.w=t.value;},
   r:function(t){draft.r=t.value;},
@@ -990,8 +1234,11 @@ var onInput={
   },
   pname:function(t){var p=progById(cur().id);if(p){p.name=t.value;save();}},
   wname:function(t){var w=wkOf(cur());if(w){w.name=t.value;save();}},
-  exname:function(t){var e=exById(t.dataset.id);if(e){e.name=t.value;save();}},
-  exstep:function(t){var e=exById(t.dataset.id);if(e){e.step=Math.max(0.25,parseNum(t.value)||2.5);save();}}
+  tm:function(){timeFromInputs();},
+  ts:function(){timeFromInputs();},
+  exq:function(t){exq=t.value;refreshPick();},
+  exstep:function(t){var e=exById(t.dataset.id);if(e)setStep(e.name,exType(e),t.value);},
+  libstep:function(t){var l=S.lib.find(function(x){return x.id===cur().id});if(l)setStep(l.name,exType(l),t.value);}
 };
 document.addEventListener('input',function(e){
   var t=e.target, k=t.dataset&&t.dataset.in;
@@ -999,13 +1246,21 @@ document.addEventListener('input',function(e){
 });
 document.addEventListener('focusin',function(e){
   var t=e.target;
-  if(t.dataset&&(t.dataset.in==='w'||t.dataset.in==='r')) setTimeout(function(){try{t.select()}catch(x){}},0);
+  if(t.dataset&&(t.dataset.in==='w'||t.dataset.in==='r'||t.dataset.in==='tm'||t.dataset.in==='ts')) setTimeout(function(){try{t.select()}catch(x){}},0);
 });
 document.addEventListener('change',function(e){
   var t=e.target, k=t.dataset&&t.dataset.in;
   if(k==='date'){
     var s=curSes(); if(!s) return;
     s.date=t.value||null; save(); render();
+  }
+  if(k==='exname'){
+    var ex0=exById(t.dataset.id);
+    if(ex0){renameEx(ex0.name,t.value); render();}
+  }
+  if(k==='libname'){
+    var l0=S.lib.find(function(x){return x.id===cur().id});
+    if(l0){var r0=renameEx(l0.name,t.value); if(r0) cur().id=r0.id; render();}
   }
   if(t.id==='file'&&t.files&&t.files[0]){
     var rd=new FileReader();
@@ -1014,7 +1269,7 @@ document.addEventListener('change',function(e){
         var d=JSON.parse(rd.result);
         if(!valid(d)) throw new Error('bad');
         if(!confirm('Заменить текущие данные данными из файла?')) return;
-        d=migrate(d); d.settings=d.settings||{rest:90};
+        d=migrate(d); d.settings=d.settings||{rest:90}; syncLib(d);
         S=d; save(); nav=[{t:'home'}]; modal=null; render(); toTop(); toast('Данные загружены');
       }catch(err){toast('Не удалось прочитать файл');}
       t.value='';
