@@ -1163,10 +1163,8 @@ var A={
     if(sim&&!confirm('Похоже на «'+sim.name+'», оно уже есть в базе. Всё равно создать новое «'+q+'»?')) return;
     var l=createLib(q,d.tp);
     if(v.t==='expick'){var w=wkOf(v); if(w) w.exercises.push(mkEx(l));}
-    save(); exq='';
-    if(v.t==='expick'){ nav.pop(); render(); toTop(); toast('Создано и добавлено'); return; }
-    var inp=document.getElementById('exq'); if(inp) inp.value='';
-    refreshPick(); toast('Создано');
+    save(); exq=''; var inp=document.getElementById('exq'); if(inp) inp.value='';
+    refreshPick(); toast(v.t==='expick'?'Создано и добавлено':'Создано');
   },
   extype:function(d){
     var e=exById(d.id); if(!e) return;
