@@ -36,6 +36,10 @@ button{touch-action:manipulation;cursor:pointer;-webkit-user-select:none;user-se
 .btn.danger{color:var(--danger)}
 .btn.big{min-height:76px;font-size:22px;margin-top:16px}
 .btn.sm{min-height:48px;width:auto;padding:0 16px}
+.logrow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:10px;margin-top:16px}
+.logrow .btn.big{margin-top:0}
+.logrow .btn.primary{font-size:clamp(16px,4.4vw,18px);padding:0 6px;line-height:1.15}
+.btn.fin{background:var(--amber);color:#1a1200;font-size:clamp(13px,3.8vw,15px);line-height:1.15;padding:0 4px;overflow-wrap:anywhere}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
 
 /* tabs */
@@ -147,7 +151,6 @@ var fmtDate=function(d){
   var p=d.split('-'), cy=String(new Date().getFullYear());
   return p[2]+'.'+p[1]+(p[0]!==cy?'.'+p[0].slice(2):'');
 };
-var fd=function(d){return d?fmtDate(d):'?'};
 var mmss=function(s){return Math.floor(s/60)+':'+pad(s%60)};
 var norm=function(s){return String(s||'').trim().toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ')};
 function fmtSets(sets){
@@ -166,8 +169,7 @@ function valid(d){return d&&Array.isArray(d.sessions)&&(Array.isArray(d.programs
 function migrate(d){
   if(Array.isArray(d.programs)) return d;
   var pid=uid();
-  var dates=(d.sessions||[]).map(function(s){return s.date}).filter(Boolean).sort();
-  var prog={id:pid,name:'Моя программа',startDate:dates[0]||today(),endDate:null,current:true,originId:pid,run:1,createdTs:Date.now(),workouts:d.workouts||[]};
+  var prog={id:pid,name:'Моя программа',current:true,originId:pid,run:1,createdTs:Date.now(),workouts:d.workouts||[]};
   var exName={};
   prog.workouts.forEach(function(w){w.exercises.forEach(function(e){exName[e.id]=e.name})});
   (d.sessions||[]).forEach(function(s){
@@ -232,12 +234,16 @@ function lastDone(p,w){
   var ds=S.sessions.filter(function(s){return s.programId===p.id&&s.workoutId===w.id&&s.done&&s.date}).map(function(s){return s.date}).sort();
   return ds.length?ds[ds.length-1]:null;
 }
-function archive(p){
-  p.current=false;
-  var ds=S.sessions.filter(function(s){return s.programId===p.id&&s.done&&s.date}).map(function(s){return s.date}).sort();
-  p.endDate=ds.length?ds[ds.length-1]:today();
+function archive(p){p.current=false;}
+// даты программы считаются только по фактическим тренировкам: первая и последняя
+function progRange(p){
+  var ds=S.sessions.filter(function(s){return s.programId===p.id&&s.date}).map(function(s){return s.date}).sort();
+  return ds.length?{start:ds[0],end:ds[ds.length-1]}:null;
 }
-var progDates=function(p){return fd(p.startDate)+' – '+(p.current?'сейчас':fd(p.endDate))};
+var progDates=function(p){
+  var r=progRange(p);
+  return r?fmtDate(r.start)+' – '+(p.current?'сейчас':fmtDate(r.end)):'';
+};
 
 /* ---------- state ---------- */
 var nav=[{t:'home'}];
@@ -285,7 +291,7 @@ function progCard(p){
     return '<div class="wrow"><span class="wn">'+esc(w.name)+'</span><span class="dots">'+dotsHtml(doneCount(p,w))+'</span></div>';
   }).join('');
   return '<button class="pcard'+(p.current?' cur':'')+((p.run||1)>1?' rep':'')+'" '+goAttr({t:'prog',id:p.id})+'>'+
-    '<div><span class="pname">'+esc(p.name)+'</span> <span class="pdates">('+progDates(p)+')</span></div>'+
+    '<div><span class="pname">'+esc(p.name)+'</span>'+(progDates(p)?' <span class="pdates">('+progDates(p)+')</span>':'')+'</div>'+
     chipsHtml(p,false)+
     (rows?'<div class="wrows">'+rows+'</div>':'<div class="small nm" style="margin-top:8px">Тренировок пока нет</div>')+
   '</button>';
@@ -308,7 +314,7 @@ function vHome(){
   if(cp) h+=progCard(cp);
   else h+='<div class="small">Сейчас нет текущей программы. Создайте новую или повторите одну из прошлых.</div>';
   var arch=S.programs.filter(function(p){return !p.current}).sort(function(a,b){
-    var ea=a.endDate||'', eb=b.endDate||'';
+    var ra=progRange(a), rb=progRange(b), ea=ra?ra.end:'', eb=rb?rb.end:'';
     if(ea!==eb) return ea<eb?1:-1;
     return (b.createdTs||0)-(a.createdTs||0);
   });
@@ -324,10 +330,6 @@ function vProg(v){
   if(!p) return bail();
   var act=S.sessions.find(function(s){return !s.done});
   var h=head(p.name);
-  h+='<div class="card'+(p.current?' active':'')+'">'+chipsHtml(p,true)+
-     '<div class="drow"><label class="datebtn">Начало: '+fd(p.startDate)+'<input type="date" data-in="pstart" value="'+(p.startDate||'')+'"></label>'+
-     (p.current?'<span class="small nm">идёт сейчас</span>':'<label class="datebtn">Конец: '+fd(p.endDate)+'<input type="date" data-in="pend" value="'+(p.endDate||'')+'"></label>')+
-     '</div></div>';
   if(!p.workouts.length){
     h+='<div class="card"><div class="title">Тренировок пока нет</div><div class="small">Добавьте тренировки, например «Верх А», «Низ А».</div><button class="btn primary" data-a="wadd">Добавить тренировку</button></div>';
   }
@@ -368,7 +370,14 @@ function exBody(ses,ex){
      '<button class="btn" data-a="step" data-k="r" data-d="-1">−</button>'+
      '<input id="in-r" data-in="r" inputmode="numeric" value="'+num(parseNum(d.r))+'">'+
      '<button class="btn" data-a="step" data-k="r" data-d="1">+</button></div>';
-  h+='<button class="btn primary big" data-a="log">'+(editing?'Сохранить подход '+(d.idx+1):'Записать подход '+(ent.sets.length+1)+' ✓')+'</button>';
+  if(editing){
+    h+='<button class="btn primary big" data-a="log">Сохранить подход '+(d.idx+1)+'</button>';
+  } else if(ent.sets.length){
+    h+='<div class="logrow"><button class="btn primary big" data-a="log">Записать подход '+(ent.sets.length+1)+' ✓</button>'+
+       '<button class="btn big fin" data-a="finex">Завершить упражнение</button></div>';
+  } else {
+    h+='<button class="btn primary big" data-a="log">Записать подход 1 ✓</button>';
+  }
   if(editing) h+='<div class="row2"><button class="btn" data-a="cancelset">Отмена</button><button class="btn danger" data-a="delset">Удалить</button></div>';
   h+='<input class="note" data-in="note" data-ex="'+ex.id+'" placeholder="Заметка" value="'+esc(ent.note||'')+'">';
   return h+'</div>';
@@ -633,7 +642,7 @@ var A={
     if(act) finishSession(act);
     if(cp) archive(cp);
     var id=uid();
-    S.programs.push({id:id,name:name.trim(),startDate:today(),endDate:null,current:true,originId:id,run:1,createdTs:Date.now(),workouts:[]});
+    S.programs.push({id:id,name:name.trim(),current:true,originId:id,run:1,createdTs:Date.now(),workouts:[]});
     save();
     nav=[{t:'home'},{t:'prog',id:id},{t:'pedit',id:id}];
     render(); toTop();
@@ -650,7 +659,7 @@ var A={
     var id=uid(), origin=p.originId||p.id;
     var run=S.programs.filter(function(x){return (x.originId||x.id)===origin}).reduce(function(m,x){return Math.max(m,x.run||1)},1)+1;
     S.programs.push({
-      id:id,name:p.name,startDate:today(),endDate:null,current:true,originId:origin,run:run,createdTs:Date.now(),
+      id:id,name:p.name,current:true,originId:origin,run:run,createdTs:Date.now(),
       workouts:p.workouts.map(function(w){
         return {id:uid(),name:w.name,exercises:w.exercises.map(function(e){return {id:uid(),name:e.name,step:e.step}})};
       })
@@ -742,6 +751,18 @@ var A={
     draft.w=w; draft.r=r;
     save(); render();
   },
+  finex:function(){
+    var s=curSes(); if(!s) return;
+    var p=progById(s.programId), wk=p?p.workouts.find(function(w){return w.id===s.workoutId}):null;
+    var exs=wk?wk.exercises:[];
+    var i=exs.findIndex(function(e){return e.id===openEx});
+    var next=(i>=0&&i+1<exs.length)?exs[i+1]:null;
+    openEx=next?next.id:null;
+    if(next) initDraft(s,next.id);
+    render();
+    var el=next?document.querySelector('.ex.open'):(document.querySelector('[data-a=finish]')||document.querySelector('.btn.big[data-a=back]'));
+    if(el&&el.scrollIntoView) el.scrollIntoView({block:next?'start':'center',behavior:'smooth'});
+  },
   rest:function(d){
     if(d.d==='stop'){rest.end=0;}
     else if(rest.end){rest.end+=(+d.d)*1000;if(rest.end>Date.now())rest.beeped=false;}
@@ -832,11 +853,6 @@ document.addEventListener('change',function(e){
   if(k==='date'){
     var s=curSes(); if(!s) return;
     s.date=t.value||null; save(); render();
-  }
-  if(k==='pstart'||k==='pend'){
-    var p=progById(cur().id); if(!p) return;
-    if(k==='pstart') p.startDate=t.value||null; else p.endDate=t.value||null;
-    save(); render();
   }
   if(t.id==='file'&&t.files&&t.files[0]){
     var rd=new FileReader();
