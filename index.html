@@ -154,6 +154,7 @@ button{touch-action:manipulation;cursor:pointer;-webkit-user-select:none;user-se
 .tin input:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 .tin small{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;line-height:1;margin-top:-2px}
 .tin b{font-size:30px;color:var(--muted);padding-bottom:12px}
+.card.bk{box-shadow:inset 0 0 0 2px var(--amber)}
 .hint{color:var(--amber);font-size:15px;margin:4px 4px 10px}
 .inw{color:var(--accent);font-weight:700}
 
@@ -182,6 +183,7 @@ var uid=function(){return Math.random().toString(36).slice(2,9)};
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var num=function(n){return String(Math.round(n*100)/100).replace('.',',')};
 var parseNum=function(s){var v=parseFloat(String(s).replace(',','.'));return isNaN(v)?0:v};
+var dateOf=function(ts){var d=new Date(ts);return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
 var pad=function(n){return String(n).padStart(2,'0')};
 var today=function(){var d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())};
 var fmtDate=function(d){
@@ -329,6 +331,27 @@ function simil(a,b){
   return lev(ca,cb)<=(Math.max(ca.length,cb.length)>=8?2:1);
 }
 
+var BK_DAYS=21, DAY=86400000;
+// когда последний раз сохраняли копию; если ни разу — с даты самой старой тренировки
+function bkRef(){
+  if(S.settings.lastBackup) return S.settings.lastBackup;
+  var ts=S.sessions.map(function(x){return x.ts}).filter(Boolean);
+  return ts.length?Math.min.apply(null,ts):0;
+}
+function bkDue(){
+  var ref=bkRef(); if(!ref) return false;
+  var now=Date.now();
+  if(S.settings.bkSnooze&&S.settings.bkSnooze>now) return false;
+  return now-ref>=BK_DAYS*DAY;
+}
+function bkBanner(){
+  if(!bkDue()) return '';
+  var d=Math.floor((Date.now()-bkRef())/DAY);
+  return '<div class="card bk"><div class="title" style="font-size:18px">Пора сохранить копию</div><div class="small">'+
+    (S.settings.lastBackup?'Копия не сохранялась уже '+d+' дн.':'Копия ещё ни разу не сохранялась, а записей уже много.')+
+    ' Нажмите «Сохранить» и выберите «Сохранить в Файлы» или отправьте себе в мессенджер.</div>'+
+    '<div class="row2" style="margin-top:0"><button class="btn primary" data-a="export">Сохранить</button><button class="btn" data-a="bksnooze">Позже</button></div></div>';
+}
 var sessionsSorted=function(){return S.sessions.slice().sort(function(a,b){return a.ts-b.ts})};
 var progById=function(id){return S.programs.find(function(p){return p.id===id})};
 var curProg=function(){return S.programs.find(function(p){return p.current})};
@@ -497,6 +520,7 @@ function vHome(){
     h+='<div class="card"><div class="title">Пока пусто</div><div class="small">Создайте программу, добавьте в неё тренировки и упражнения и начинайте заниматься.</div><button class="btn primary" data-a="padd">Создать программу</button></div>';
     return h;
   }
+  h+=bkBanner();
   var cp=curProg();
   if(cp) h+=progCard(cp);
   else h+='<div class="small">Сейчас нет текущей программы. Создайте новую или повторите одну из прошлых.</div>';
@@ -680,7 +704,9 @@ function vMore(){
     '<button class="trow" data-a="track"><span><span class="tl">Отслеживать отдых</span><span class="td">После таймера появится кнопка «Начать подход». В конце тренировки — время подходов и отдыха.</span></span><span class="sw'+(S.settings.track?' on':'')+'"><i></i></span></button></div>'+
   '<div class="card"><div class="title">Упражнения</div><div class="small">Общая база: выбор при добавлении, переименование, объединение дублей.</div>'+
     '<button class="btn" '+goAttr({t:'exlib'})+'>База упражнений · '+S.lib.length+'</button></div>'+
-  '<div class="card"><div class="title">Резервная копия</div><div class="small">Данные хранятся только на этом телефоне. Время от времени сохраняйте копию (например, в «Файлы» или себе в мессенджер).</div>'+
+  '<div class="card"><div class="title">Резервная копия</div><div class="small">Данные хранятся только на этом телефоне. Приложение напомнит о копии раз в 3 недели (например, сохраните её в «Файлы» или отправьте себе в мессенджер).</div>'+
+    '<div class="small">Защита данных от очистки: <b>'+(persistState==='yes'?'включена':persistState==='no'?'не подтверждена':persistState==='na'?'не поддерживается':'проверяется…')+'</b>'+(persistState==='no'?'. Это не значит, что данные пропадут, но делайте копии регулярно.':'')+'</div>'+
+    '<div class="small">'+(S.settings.lastBackup?'Последняя копия: '+esc(fmtDate(dateOf(S.settings.lastBackup))):'Копия ещё не сохранялась')+'</div>'+
     '<div class="row2" style="margin-top:0"><button class="btn" data-a="export">Сохранить</button><button class="btn" data-a="import">Загрузить</button></div></div>';
 }
 
@@ -918,11 +944,16 @@ function exportData(){
   };
   try{
     if(navigator.canShare&&navigator.canShare({files:[file]})){
-      navigator.share({files:[file],title:name}).catch(function(e){if(e&&e.name!=='AbortError')fallback()});
+      navigator.share({files:[file],title:name}).then(markBackup).catch(function(e){if(e&&e.name!=='AbortError'){fallback();markBackup();}});
       return;
     }
   }catch(e){}
-  fallback();
+  fallback(); markBackup();
+}
+function markBackup(){
+  S.settings.lastBackup=Date.now(); delete S.settings.bkSnooze; save();
+  if(!modal&&/^(home|more)$/.test(cur().t)) render();
+  toast('Копия сохранена');
 }
 
 /* ---------- actions ---------- */
@@ -1133,6 +1164,7 @@ var A={
   },
 
   export:function(){exportData();},
+  bksnooze:function(){S.settings.bkSnooze=Date.now()+3*DAY;save();render();},
   import:function(){document.getElementById('file').click();},
 
   // редактор
@@ -1270,6 +1302,7 @@ document.addEventListener('change',function(e){
         if(!valid(d)) throw new Error('bad');
         if(!confirm('Заменить текущие данные данными из файла?')) return;
         d=migrate(d); d.settings=d.settings||{rest:90}; syncLib(d);
+        d.settings.lastBackup=Date.now(); delete d.settings.bkSnooze;
         S=d; save(); nav=[{t:'home'}]; modal=null; render(); toTop(); toast('Данные загружены');
       }catch(err){toast('Не удалось прочитать файл');}
       t.value='';
@@ -1279,6 +1312,19 @@ document.addEventListener('change',function(e){
 });
 window.addEventListener('pagehide',save);
 
+var persistState='unknown';
+function checkPersist(){
+  try{
+    var st=navigator.storage;
+    if(!st||!st.persisted){persistState='na';return;}
+    var done=function(v){persistState=v?'yes':'no'; if(cur().t==='more'&&!modal) render();};
+    st.persisted().then(function(v){
+      if(v||!st.persist){done(v);return;}
+      st.persist().then(done,function(){done(false)});
+    },function(){persistState='na'});
+  }catch(e){persistState='na';}
+}
+checkPersist();
 render();
 if('serviceWorker' in navigator&&location.protocol!=='file:'){
   navigator.serviceWorker.register('sw.js').catch(function(){});
