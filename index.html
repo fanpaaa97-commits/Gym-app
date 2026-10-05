@@ -154,6 +154,10 @@ button{touch-action:manipulation;cursor:pointer;-webkit-user-select:none;user-se
 .tin input:focus{box-shadow:inset 0 0 0 2px var(--accent)}
 .tin small{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;line-height:1;margin-top:-2px}
 .tin b{font-size:30px;color:var(--muted);padding-bottom:12px}
+.swbox{display:flex;align-items:center;gap:10px;background:var(--card2);border-radius:16px;padding:8px 8px 8px 16px;margin-top:14px}
+.swt{flex:1;font-size:44px;font-weight:800;font-variant-numeric:tabular-nums;color:var(--accent);letter-spacing:-.5px}
+.swbox .btn{width:auto;min-width:124px;min-height:64px;background:var(--amber);color:#1a1200}
+.btn.swgo{margin-top:14px;min-height:64px;background:var(--card2);color:var(--accent)}
 .card.bk{box-shadow:inset 0 0 0 2px var(--amber)}
 .hint{color:var(--amber);font-size:15px;margin:4px 4px 10px}
 .inw{color:var(--accent);font-weight:700}
@@ -575,6 +579,12 @@ function exBody(ses,ex){
   if(chips) h+='<div class="chips">'+chips+'</div>';
   if(exType(ex)==='t'){
     var sc=Math.max(0,Math.round(parseNum(d.s)));
+    if(!editing){
+      var sw=(ses.sw&&ses.sw.ex===ex.id)?ses.sw:null;
+      h+=sw
+        ? '<div class="swbox"><div class="swt" id="swtime">'+mmss(Math.max(0,Math.floor((Date.now()-sw.start)/1000)))+'</div><button class="btn" data-a="swstop">■ Стоп</button></div>'
+        : '<button class="btn swgo" data-a="swstart">▶ Начать подход</button>';
+    }
     h+='<div class="lbl">Время</div><div class="stepper t">'+
        '<button class="btn" data-a="step" data-k="s" data-d="-1">−</button>'+
        '<div class="tin"><label><input id="in-tm" data-in="tm" inputmode="numeric" value="'+Math.floor(sc/60)+'"><small>мин</small></label><b>:</b>'+
@@ -701,6 +711,7 @@ function vMore(){
   return '<h1>Ещё</h1>'+
   '<div class="card"><div class="title">Таймер отдыха</div><div class="small">Запускается после каждого подхода</div><div class="stepper">'+
     '<button class="btn" data-a="restset" data-d="-15">−</button><input readonly value="'+S.settings.rest+' с" style="font-size:30px"><button class="btn" data-a="restset" data-d="15">+</button></div>'+
+    '<button class="btn" style="margin-top:14px" data-a="beeptest">🔔 Проверить звук</button>'+
     '<button class="trow" data-a="track"><span><span class="tl">Отслеживать отдых</span><span class="td">После таймера появится кнопка «Начать подход». В конце тренировки — время подходов и отдыха.</span></span><span class="sw'+(S.settings.track?' on':'')+'"><i></i></span></button></div>'+
   '<div class="card"><div class="title">Упражнения</div><div class="small">Общая база: выбор при добавлении, переименование, объединение дублей.</div>'+
     '<button class="btn" '+goAttr({t:'exlib'})+'>База упражнений · '+S.lib.length+'</button></div>'+
@@ -830,27 +841,61 @@ function render(){
 var toTop=function(){window.scrollTo(0,0)};
 
 /* ---------- timer / sound / wake ---------- */
-var actx=null;
+var actx=null, beepAudio=null, audioReady=false;
+// короткий двойной сигнал в виде WAV: HTML-аудио на iPhone играет и при включённом беззвучном режиме, в отличие от WebAudio
+function wavUrl(){
+  var sr=22050, n=Math.round(sr*0.6), buf=new ArrayBuffer(44+n*2), v=new DataView(buf), i;
+  var ws=function(o,t){for(var k=0;k<t.length;k++)v.setUint8(o+k,t.charCodeAt(k))};
+  ws(0,'RIFF');v.setUint32(4,36+n*2,true);ws(8,'WAVEfmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
+  v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,n*2,true);
+  for(i=0;i<n;i++){
+    var t=i/sr, tt=t<0.2?t:(t>=0.3&&t<0.5?t-0.3:-1), a=0;
+    if(tt>=0) a=Math.sin(2*Math.PI*880*t)*0.7*Math.min(1,tt/0.01,(0.2-tt)/0.01);
+    v.setInt16(44+i*2,Math.round(a*32767),true);
+  }
+  return URL.createObjectURL(new Blob([buf],{type:'audio/wav'}));
+}
+// вызывается при любом касании: «будит» звук, чтобы сигнал сработал позже без участия пользователя
 function unlockAudio(){
   try{
     var C=window.AudioContext||window.webkitAudioContext;
-    if(!C) return;
-    actx=actx||new C();
-    if(actx.state==='suspended') actx.resume();
+    if(C){actx=actx||new C(); if(actx.state!=='running') actx.resume();}
+  }catch(e){}
+  try{
+    if(!beepAudio){beepAudio=new Audio(wavUrl()); beepAudio.preload='auto';}
+    if(!audioReady){
+      beepAudio.muted=true;
+      var pr=beepAudio.play();
+      var ready=function(){beepAudio.pause();beepAudio.currentTime=0;beepAudio.muted=false;audioReady=true;};
+      if(pr&&pr.then) pr.then(ready).catch(function(){beepAudio.muted=false;}); else ready();
+    }
   }catch(e){}
 }
-function beep(){
+function webBeep(){
   try{
     if(!actx) return;
+    if(actx.state!=='running') actx.resume();
     [0,0.3].forEach(function(dt){
       var o=actx.createOscillator(), g=actx.createGain();
       o.connect(g); g.connect(actx.destination);
       o.frequency.value=880; g.gain.value=0.25;
       o.start(actx.currentTime+dt); o.stop(actx.currentTime+dt+0.2);
     });
-    if(navigator.vibrate) navigator.vibrate([200,100,200]);
   }catch(e){}
 }
+function beep(){
+  try{
+    if(beepAudio&&audioReady){
+      beepAudio.currentTime=0;
+      var pr=beepAudio.play();
+      if(pr&&pr.catch) pr.catch(function(){});
+    }
+  }catch(e){}
+  webBeep();
+  try{if(navigator.vibrate) navigator.vibrate([200,100,200]);}catch(e){}
+}
+document.addEventListener('pointerdown',unlockAudio,{passive:true});
+document.addEventListener('touchend',unlockAudio,{passive:true});
 // состояние таймера хранится в самой тренировке (s.rt), поэтому переживает перезагрузку:
 // from — когда начался отдых, end — когда он закончится, start — когда нажали «Начать подход»
 function startRest(s){
@@ -861,6 +906,8 @@ function tick(){
   var bar=document.getElementById('restbar');
   if(!bar) return;
   var s=curSes(), rt=(s&&!s.done&&s.rt)||{}, tr=!!S.settings.track, now=Date.now();
+  var swe=document.getElementById('swtime');
+  if(swe&&s&&s.sw) swe.textContent=mmss(Math.max(0,Math.floor((now-s.sw.start)/1000)));
   var show=false, line=false, btn=false, big=false, done=false, text='';
   if(s&&!s.done&&!rt.start){
     if(rt.from){
@@ -869,7 +916,7 @@ function tick(){
       if(left>0) text='Отдых '+mmss(Math.ceil(left/1000));
       else {
         done=true; text='Отдых окончен';
-        if(!rt.beeped){rt.beeped=true; if(now-rt.end<3000) beep();}
+        if(!rt.beeped){rt.beeped=true; if(now-rt.end<8000) beep();}
       }
       btn=tr; big=tr&&done;
     } else if(tr&&!s.last){
@@ -897,7 +944,10 @@ function wake(on){
   }catch(e){}
 }
 document.addEventListener('visibilitychange',function(){
-  if(document.visibilityState==='visible'&&cur().t==='session') wake(true);
+  if(document.visibilityState==='visible'){
+    try{if(actx&&actx.state!=='running') actx.resume();}catch(e){}
+    if(cur().t==='session') wake(true);
+  }
 });
 
 var toastT=null;
@@ -924,7 +974,7 @@ function finishSession(s){
   var n=Object.keys(s.entries).reduce(function(a,k){return a+s.entries[k].sets.length},0);
   if(!n) S.sessions=S.sessions.filter(function(x){return x.id!==s.id});
   else {s.done=true; s.t1=Date.now();}
-  delete s.rt;
+  delete s.rt; delete s.sw;
   save();
 }
 // завершить тренировку и показать окно итогов; true — тренировка сохранена (пустая удаляется)
@@ -1088,6 +1138,7 @@ var A={
     var s=curSes(); if(!s||!draft.exId) return;
     var ex=exById(draft.exId), now=Date.now(), tm=exType(ex)==='t';
     var r=Math.round(parseNum(draft.r)), w=parseNum(draft.w), sc=Math.round(parseNum(draft.s));
+    if(tm&&draft.idx===null&&s.sw&&s.sw.ex===draft.exId){ sc=Math.max(1,Math.round((now-s.sw.start)/1000)); delete s.sw; }
     if(tm){ if(sc<=0){toast('Укажите время');return;} r=0; w=0; }
     else if(r<=0){toast('Укажите повторы');return;}
     var ent=s.entries[draft.exId]||(s.entries[draft.exId]={sets:[],note:''});
@@ -1125,7 +1176,9 @@ var A={
     var now=Date.now();
     s.rt={from:null,end:null,start:now,beeped:true};   // идёт подход: таймер скрыт
     if(!s.t0) s.t0=now;
-    save(); tick();
+    var tmx=exType(exById(draft.exId))==='t'&&draft.exId===openEx;
+    if(tmx) s.sw={ex:openEx,start:now};                // упражнение на время — сразу запускаем секундомер
+    save(); if(tmx) render(); else tick();
   },
   finex:function(){
     var s=curSes(); if(!s) return;
@@ -1136,6 +1189,7 @@ var A={
     openEx=next?next.id:null;
     if(next) initDraft(s,next.id);
     if(!s.done){
+      delete s.sw;
       var rt=s.rt||{};
       if(next){ if(s.last&&!rt.from&&!rt.start) startRest(s); }   // отдых между упражнениями
       else s.rt={};                                               // упражнения закончились — отдыхать уже не нужно
@@ -1157,6 +1211,21 @@ var A={
     }
     save(); tick();
   },
+  swstart:function(){
+    var s=curSes(); if(!s||s.done||!draft.exId) return;
+    unlockAudio();
+    var now=Date.now();
+    s.sw={ex:draft.exId,start:now};
+    if(S.settings.track&&!(s.rt&&s.rt.start)) s.rt={from:null,end:null,start:now,beeped:true};
+    if(!s.t0) s.t0=now;
+    save(); render();
+  },
+  swstop:function(){
+    var s=curSes(); if(!s||!s.sw) return;
+    if(s.sw.ex===draft.exId) draft.s=Math.max(0,Math.round((Date.now()-s.sw.start)/1000));
+    delete s.sw; save(); render();
+  },
+  beeptest:function(){unlockAudio();beep();toast('Сигнал. Не слышно — проверьте громкость и переключатель звука');},
   track:function(){S.settings.track=!S.settings.track;save();render();},
   restset:function(d){
     S.settings.rest=Math.min(600,Math.max(15,S.settings.rest+(+d.d)));
