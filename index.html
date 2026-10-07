@@ -355,7 +355,7 @@ function simil(a,b){
   return lev(ca,cb)<=(Math.max(ca.length,cb.length)>=8?2:1);
 }
 
-var BK_DAYS=21, DAY=86400000;
+var BK_DAYS=22, DAY=86400000;
 // когда последний раз сохраняли копию; если ни разу — с даты самой старой тренировки
 function bkRef(){
   if(S.settings.lastBackup) return S.settings.lastBackup;
@@ -834,7 +834,7 @@ function vMore(){
   '<div class="card"><div class="title">Упражнения</div><div class="small">Общая база: выбор при добавлении, переименование, объединение дублей.</div>'+
     '<button class="btn" '+goAttr({t:'exlib'})+'>База упражнений · '+S.lib.length+'</button></div>'+
   wordsCard()+
-  '<div class="card"><div class="title">Резервная копия</div><div class="small">Данные хранятся только на этом телефоне. Приложение напомнит о копии раз в 3 недели (например, сохраните её в «Файлы» или отправьте себе в мессенджер).</div>'+
+  '<div class="card"><div class="title">Резервная копия</div><div class="small">Данные хранятся только на этом телефоне. Приложение напомнит о копии раз в 22 дня (например, сохраните её в «Файлы» или отправьте себе в мессенджер).</div>'+
     '<div class="small">Защита данных от очистки: <b>'+(persistState==='yes'?'включена':persistState==='no'?'не подтверждена':persistState==='na'?'не поддерживается':'проверяется…')+'</b>'+(persistState==='no'?'. Это не значит, что данные пропадут, но делайте копии регулярно.':'')+'</div>'+
     '<div class="small">'+(S.settings.lastBackup?'Последняя копия: '+esc(fmtDate(dateOf(S.settings.lastBackup))):'Копия ещё не сохранялась')+'</div>'+
     '<div class="row2" style="margin-top:0"><button class="btn" data-a="export">Сохранить</button><button class="btn" data-a="import">Загрузить</button></div></div>';
