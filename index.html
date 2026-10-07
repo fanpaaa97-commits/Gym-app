@@ -277,8 +277,9 @@ function syncLib(d){
   d.sessions.forEach(function(s){Object.keys(s.entries||{}).forEach(function(k){var e=s.entries[k];if(e&&e.sets&&e.sets.length)add(e.name,null,e.sets)})});
 }
 syncLib(S); save();
-function createLib(name,tp){
-  var l={id:uid(),name:name,type:tp==='t'?'t':'w',step:2.5,tstep:30};
+var NEW_STEPS=[0.5,1,2,2.5,5], newStep=1; // шаг веса для нового упражнения «вес × повторы»
+function createLib(name,tp,step){
+  var l={id:uid(),name:name,type:tp==='t'?'t':'w',step:step||1,tstep:30};
   S.lib.push(l); return l;
 }
 var mkEx=function(l){return {id:uid(),name:l.name,step:l.step||2.5,tstep:l.tstep||30,type:exType(l)}};
@@ -898,6 +899,8 @@ function pickBody(v){
   }
   if(nq&&!exact){
     h+='<div class="gh">Создать новое «'+esc(q)+'»</div>'+
+       '<div class="small">Шаг веса для «Вес × повторы», кг</div>'+
+       '<div class="chips" style="margin:6px 0 12px">'+NEW_STEPS.map(function(x){return '<button class="chip'+(x===newStep?' sel':'')+'" data-a="newstep" data-v="'+x+'">'+num(x)+'</button>'}).join('')+'</div>'+
        '<div class="row2" style="margin-top:0"><button class="btn" data-a="newex" data-tp="w">Вес × повторы</button><button class="btn" data-a="newex" data-tp="t">Время</button></div>';
   } else if(nq&&exact&&!lst.length){ h+=''; }
   return h;
@@ -1407,11 +1410,12 @@ var A={
     if(libFind(q)){toast('Такое уже есть в базе');return;}
     var sim=S.lib.find(function(l){return simil(l.name,q)});
     if(sim&&!confirm('Похоже на «'+sim.name+'», оно уже есть в базе. Всё равно создать новое «'+q+'»?')) return;
-    var l=createLib(q,d.tp);
+    var l=createLib(q,d.tp,newStep); newStep=1;
     if(v.t==='expick'){var w=wkOf(v); if(w) w.exercises.push(mkEx(l));}
     save(); exq=''; var inp=document.getElementById('exq'); if(inp) inp.value='';
     refreshPick(); toast(v.t==='expick'?'Создано и добавлено':'Создано');
   },
+  newstep:function(d){newStep=parseNum(d.v)||1; refreshPick();},
   extype:function(d){
     var e=exById(d.id); if(!e) return;
     applyProps(e.name,{type:d.v==='t'?'t':'w'}); save(); render();
