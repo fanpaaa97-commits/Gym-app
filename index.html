@@ -831,9 +831,9 @@ function vMore(){
     '<button class="btn" data-a="restset" data-d="-15">−</button><input readonly value="'+S.settings.rest+' с" style="font-size:30px"><button class="btn" data-a="restset" data-d="15">+</button></div>'+
     '<button class="btn" style="margin-top:14px" data-a="beeptest">🔔 Проверить звук</button>'+
     '<button class="trow" data-a="track"><span><span class="tl">Отслеживать отдых</span><span class="td">После таймера появится кнопка «Начать подход». В конце тренировки — время подходов и отдыха.</span></span><span class="sw'+(S.settings.track?' on':'')+'"><i></i></span></button></div>'+
-  wordsCard()+
   '<div class="card"><div class="title">Упражнения</div><div class="small">Общая база: выбор при добавлении, переименование, объединение дублей.</div>'+
     '<button class="btn" '+goAttr({t:'exlib'})+'>База упражнений · '+S.lib.length+'</button></div>'+
+  wordsCard()+
   '<div class="card"><div class="title">Резервная копия</div><div class="small">Данные хранятся только на этом телефоне. Приложение напомнит о копии раз в 3 недели (например, сохраните её в «Файлы» или отправьте себе в мессенджер).</div>'+
     '<div class="small">Защита данных от очистки: <b>'+(persistState==='yes'?'включена':persistState==='no'?'не подтверждена':persistState==='na'?'не поддерживается':'проверяется…')+'</b>'+(persistState==='no'?'. Это не значит, что данные пропадут, но делайте копии регулярно.':'')+'</div>'+
     '<div class="small">'+(S.settings.lastBackup?'Последняя копия: '+esc(fmtDate(dateOf(S.settings.lastBackup))):'Копия ещё не сохранялась')+'</div>'+
