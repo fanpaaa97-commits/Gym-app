@@ -115,6 +115,8 @@ button{touch-action:manipulation;cursor:pointer;-webkit-user-select:none;user-se
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .chip{border:0;background:var(--card2);border-radius:12px;padding:12px 14px;font-size:17px;font-weight:600;min-height:48px}
 .chip.sel{box-shadow:inset 0 0 0 2px var(--accent)}
+.newex .chips{flex-wrap:nowrap;gap:6px;margin:6px 0 10px}
+.newex .chip{flex:1;min-width:0;padding:10px 2px;font-size:15px;white-space:nowrap}
 .lbl{color:var(--muted);font-size:13px;margin:14px 0 6px;text-transform:uppercase;letter-spacing:.07em}
 .stepper{display:grid;grid-template-columns:84px 1fr 84px;gap:10px}
 .stepper .btn{min-height:76px;font-size:38px;padding:0;line-height:1}
@@ -277,9 +279,10 @@ function syncLib(d){
   d.sessions.forEach(function(s){Object.keys(s.entries||{}).forEach(function(k){var e=s.entries[k];if(e&&e.sets&&e.sets.length)add(e.name,null,e.sets)})});
 }
 syncLib(S); save();
-var NEW_STEPS=[0.5,1,2,2.5,5], newStep=1; // шаг веса для нового упражнения «вес × повторы»
-function createLib(name,tp,step){
-  var l={id:uid(),name:name,type:tp==='t'?'t':'w',step:step||1,tstep:30};
+// шаги для нового упражнения: вес (кг) для «вес × повторы», время (с) для «время»
+var NEW_STEPS=[1,2,2.5], newStep=1, NEW_TSTEPS=[15,60,300], newTStep=15;
+function createLib(name,tp,step,tstep){
+  var l={id:uid(),name:name,type:tp==='t'?'t':'w',step:step||1,tstep:tstep||30};
   S.lib.push(l); return l;
 }
 var mkEx=function(l){return {id:uid(),name:l.name,step:l.step||2.5,tstep:l.tstep||30,type:exType(l)}};
@@ -899,9 +902,11 @@ function pickBody(v){
   }
   if(nq&&!exact){
     h+='<div class="gh">Создать новое «'+esc(q)+'»</div>'+
-       '<div class="small">Шаг веса для «Вес × повторы», кг</div>'+
-       '<div class="chips" style="margin:6px 0 12px">'+NEW_STEPS.map(function(x){return '<button class="chip'+(x===newStep?' sel':'')+'" data-a="newstep" data-v="'+x+'">'+num(x)+'</button>'}).join('')+'</div>'+
-       '<div class="row2" style="margin-top:0"><button class="btn" data-a="newex" data-tp="w">Вес × повторы</button><button class="btn" data-a="newex" data-tp="t">Время</button></div>';
+       '<div class="row2 newex" style="margin-top:0">'+
+         '<div><div class="small">Шаг веса</div><div class="chips">'+NEW_STEPS.map(function(x){return '<button class="chip'+(x===newStep?' sel':'')+'" data-a="newstep" data-v="'+x+'">'+num(x)+' кг</button>'}).join('')+'</div>'+
+           '<button class="btn" data-a="newex" data-tp="w">Вес × повторы</button></div>'+
+         '<div><div class="small">Шаг времени</div><div class="chips">'+NEW_TSTEPS.map(function(x){return '<button class="chip'+(x===newTStep?' sel':'')+'" data-a="newtstep" data-v="'+x+'">'+(x<60?x+' с':x/60+' мин')+'</button>'}).join('')+'</div>'+
+           '<button class="btn" data-a="newex" data-tp="t">Время</button></div></div>';
   } else if(nq&&exact&&!lst.length){ h+=''; }
   return h;
 }
@@ -1410,12 +1415,13 @@ var A={
     if(libFind(q)){toast('Такое уже есть в базе');return;}
     var sim=S.lib.find(function(l){return simil(l.name,q)});
     if(sim&&!confirm('Похоже на «'+sim.name+'», оно уже есть в базе. Всё равно создать новое «'+q+'»?')) return;
-    var l=createLib(q,d.tp,newStep); newStep=1;
+    var l=createLib(q,d.tp,newStep,newTStep); newStep=1; newTStep=15;
     if(v.t==='expick'){var w=wkOf(v); if(w) w.exercises.push(mkEx(l));}
     save(); exq=''; var inp=document.getElementById('exq'); if(inp) inp.value='';
     refreshPick(); toast(v.t==='expick'?'Создано и добавлено':'Создано');
   },
   newstep:function(d){newStep=parseNum(d.v)||1; refreshPick();},
+  newtstep:function(d){newTStep=parseNum(d.v)||15; refreshPick();},
   extype:function(d){
     var e=exById(d.id); if(!e) return;
     applyProps(e.name,{type:d.v==='t'?'t':'w'}); save(); render();
