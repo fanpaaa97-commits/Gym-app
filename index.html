@@ -1080,10 +1080,15 @@ function startRest(s){
   var now=Date.now();
   s.rt={from:now,end:now+S.settings.rest*1000,start:null,beeped:false};
 }
+// сигнал только если отдых шёл на экране и закончился на глазах (без перерыва в работе приложения);
+// при открытии приложения, входе в тренировку или возврате из фона — тишина
+var lastTick=0, seenEnd=0;
 function tick(){
+  var now=Date.now(), live=lastTick>0&&now-lastTick<2000&&!document.hidden;
+  lastTick=now;
   var bar=document.getElementById('restbar');
   if(!bar) return;
-  var s=curSes(), rt=(s&&!s.done&&s.rt)||{}, tr=!!S.settings.track, now=Date.now();
+  var s=curSes(), rt=(s&&!s.done&&s.rt)||{}, tr=!!S.settings.track;
   var swe=document.getElementById('swtime');
   if(swe&&s&&s.sw) swe.textContent=mmss(Math.max(0,Math.floor((now-s.sw.start)/1000)));
   var show=false, line=false, btn=false, big=false, done=false, text='';
@@ -1091,10 +1096,10 @@ function tick(){
     if(rt.from){
       show=true; line=true;
       var left=rt.end-now;
-      if(left>0) text='Отдых '+mmss(Math.ceil(left/1000));
+      if(left>0){ text='Отдых '+mmss(Math.ceil(left/1000)); seenEnd=rt.end; }
       else {
         done=true; text='Отдых окончен';
-        if(!rt.beeped){rt.beeped=true; if(now-rt.end<8000) beep();}
+        if(!rt.beeped){rt.beeped=true; if(live&&seenEnd===rt.end&&now-rt.end<8000) beep();}
       }
       btn=tr; big=tr&&done;
     } else if(tr&&!s.last){
