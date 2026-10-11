@@ -848,7 +848,7 @@ function vCal(){
 }
 
 function vHistory(){
-  var h='<h1>История</h1><div class="seg s3"><button class="'+(hseg==='s'?'on':'')+'" data-a="hseg" data-v="s">Тренировки</button><button class="'+(hseg==='e'?'on':'')+'" data-a="hseg" data-v="e">Упражнения</button><button class="'+(hseg==='c'?'on':'')+'" data-a="hseg" data-v="c">Календарь</button></div>';
+  var h='<h1>История</h1><div class="seg s3"><button class="'+(hseg==='c'?'on':'')+'" data-a="hseg" data-v="c">Календарь</button><button class="'+(hseg==='s'?'on':'')+'" data-a="hseg" data-v="s">Тренировки</button><button class="'+(hseg==='e'?'on':'')+'" data-a="hseg" data-v="e">Упражнения</button></div>';
   if(hseg==='c') return h+vCal();
   if(hseg==='s'){
     var list=S.sessions.slice().sort(function(a,b){
