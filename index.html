@@ -28,6 +28,9 @@ body{margin:0;min-height:var(--full,calc(100vh + 2px));overflow-x:hidden;touch-a
 .dlg .btn.cta{margin-top:0}
 .dlg .row2{margin-top:14px}
 .dlg .text{margin-bottom:0}
+.modal.dlg.center{align-items:center;padding-top:20px}   /* подтверждения — по центру */
+.dlg .stack{display:grid;gap:10px;margin-top:18px}
+.btn.dng{background:linear-gradient(180deg,#ff8585,#ff5a5a);color:#2a0606;box-shadow:0 1px 0 rgba(255,255,255,.3) inset,0 6px 18px rgba(255,90,90,.2)}
 .ghost.flat{box-shadow:none}   /* смена вкладки: экраны рядом, без тени */
 .swapwrap{position:relative;overflow:hidden;margin:0 -16px -24px;padding:0 16px 24px}   /* зона слайда внутри экрана (переключатель разделов, месяцы) */
 .swapout{position:absolute;left:16px;right:16px;top:0;pointer-events:none}
@@ -386,22 +389,27 @@ function renameEverywhere(on,nn){
   S.sessions.forEach(function(s){Object.keys(s.entries).forEach(function(k){var e=s.entries[k];if(norm(e.name)===on)e.name=nn})});
 }
 // переименование = во всей базе и истории; если такое имя уже есть — объединение. Возвращает итоговую запись базы.
-function renameEx(oldName,val){
+// результат передаётся в done(запись базы или null): при объединении сначала спрашиваем подтверждение в окне приложения
+function renameEx(oldName,val,done){
   var nn=String(val||'').trim().replace(/\s+/g,' ');
-  if(!nn||nn===oldName) return null;
+  if(!nn||nn===oldName){done(null);return;}
   syncLib(S);
   var on=norm(oldName), lib=libFind(oldName);
   var other=S.lib.find(function(l){return l!==lib&&norm(l.name)===norm(nn)});
   if(other){
-    if(!confirm('«'+other.name+'» уже есть в базе. Объединить «'+oldName+'» с ним? История по обоим станет общей.')) return null;
-    S.lib=S.lib.filter(function(l){return l!==lib});
-    renameEverywhere(on,other.name);
-    applyProps(other.name,{type:exType(other),step:other.step||2.5,tstep:other.tstep||30});
-    save(); return other;
+    askConfirm({title:'Объединить упражнения?',text:'«'+other.name+'» уже есть в базе. Объединить «'+oldName+'» с ним? История по обоим станет общей.',ok:'Объединить',
+      cb:function(){
+        S.lib=S.lib.filter(function(l){return l!==lib});
+        renameEverywhere(on,other.name);
+        applyProps(other.name,{type:exType(other),step:other.step||2.5,tstep:other.tstep||30});
+        save(); done(other);
+      },
+      no:function(){done(null);}});
+    return;
   }
   if(lib) lib.name=nn;
   renameEverywhere(on,nn);
-  save(); return lib||libFind(nn);
+  save(); done(lib||libFind(nn));
 }
 function libStats(){
   var m=Object.create(null);
@@ -1193,24 +1201,40 @@ function render(){
 var toTop=function(){window.scrollTo(0,0)};
 
 // окно ввода названия в стиле приложения (вместо системного prompt): askText({title,hint,value,ok,cb})
-function askText(o){
+function dlgOpen(inner,cls){
   var old=document.getElementById('dlg'); if(old) old.remove();
-  var d=document.createElement('div'); d.id='dlg'; d.className='modal dlg';
-  d.innerHTML='<div class="mcard"><div class="title" style="margin-bottom:14px">'+esc(o.title)+'</div>'+
-    '<input class="text" id="dlg-in" autocomplete="off" autocapitalize="sentences" enterkeyhint="done" maxlength="60" placeholder="'+esc(o.hint||'')+'" value="'+esc(o.value||'')+'">'+
-    '<div class="row2"><button class="btn cta" data-dlg="no">Отмена</button><button class="btn primary cta" data-dlg="ok">'+esc(o.ok||'Готово')+'</button></div></div>';
+  var d=document.createElement('div'); d.id='dlg'; d.className='modal dlg'+(cls?' '+cls:'');
+  d.innerHTML='<div class="mcard">'+inner+'</div>';
   document.body.appendChild(d);
-  var inp=d.querySelector('#dlg-in'), okb=d.querySelector('[data-dlg=ok]'), closed=false;
+  return d;
+}
+function dlgClose(d){
+  if(d._closed) return; d._closed=true;
+  var a=document.activeElement; if(a&&d.contains(a)&&a.blur) a.blur();
+  if(!canAnim()||!d.animate){d.remove();return;}
+  d.style.pointerEvents='none';
+  var mc=d.querySelector('.mcard'); d.style.animation='none'; if(mc) mc.style.animation='none';
+  d.animate([{opacity:1},{opacity:0}],{duration:180,easing:'ease-out'}).onfinish=function(){d.remove()};
+  setTimeout(function(){d.remove()},450);
+}
+// окно подтверждения в стиле приложения (вместо системного confirm): askConfirm({title,text,ok,danger,cb,no})
+function askConfirm(o){
+  var d=dlgOpen('<div class="title" style="margin-bottom:6px">'+esc(o.title||'Подтвердите')+'</div>'+
+    (o.text?'<div class="small" style="margin:0">'+esc(o.text)+'</div>':'')+
+    '<div class="stack"><button class="btn cta '+(o.danger?'dng':'primary')+'" data-dlg="ok">'+esc(o.ok||'Да')+'</button>'+
+    '<button class="btn cta" data-dlg="no">Отмена</button></div>','center');
+  d.addEventListener('click',function(e){
+    if(e.target.closest('[data-dlg=ok]')){ dlgClose(d); if(o.cb) o.cb(); }
+    else if(e.target.closest('[data-dlg=no]')||e.target===d){ dlgClose(d); if(o.no) o.no(); }
+  });
+}
+function askText(o){
+  var d=dlgOpen('<div class="title" style="margin-bottom:14px">'+esc(o.title)+'</div>'+
+    '<input class="text" id="dlg-in" autocomplete="off" autocapitalize="sentences" enterkeyhint="done" maxlength="60" placeholder="'+esc(o.hint||'')+'" value="'+esc(o.value||'')+'">'+
+    '<div class="row2"><button class="btn cta" data-dlg="no">Отмена</button><button class="btn primary cta" data-dlg="ok">'+esc(o.ok||'Готово')+'</button></div>');
+  var inp=d.querySelector('#dlg-in'), okb=d.querySelector('[data-dlg=ok]');
   var sync=function(){okb.disabled=!inp.value.trim();};
-  var close=function(){
-    if(closed) return; closed=true;
-    inp.blur();
-    if(!canAnim()||!d.animate){d.remove();return;}
-    d.style.pointerEvents='none';
-    var mc=d.querySelector('.mcard'); d.style.animation='none'; if(mc) mc.style.animation='none';
-    d.animate([{opacity:1},{opacity:0}],{duration:180,easing:'ease-out'}).onfinish=function(){d.remove()};
-    setTimeout(function(){d.remove()},450);
-  };
+  var close=function(){dlgClose(d)};
   var submit=function(){
     var v=inp.value.trim(); if(!v) return;
     close(); o.cb(v);
@@ -1524,44 +1548,49 @@ var A={
   padd:function(){
     askText({title:'Новая программа',hint:'Название программы',ok:'Создать',cb:function(name){
       var act=S.sessions.find(function(s){return !s.done});
-      var cp=curProg();
-      if(act&&!confirm('Сейчас идёт тренировка. Завершить её и создать новую программу?')) return;
-      if(act) finishSession(act);
-      if(cp) archive(cp);
-      var id=uid();
-      S.programs.push({id:id,name:name,current:true,originId:id,run:1,createdTs:Date.now(),workouts:[]});
-      save();
-      nav=[{t:'home'},{t:'prog',id:id},{t:'pedit',id:id}];
-      render(); toTop();
+      var go=function(){
+        var cp=curProg(), a2=S.sessions.find(function(s){return !s.done});
+        if(a2) finishSession(a2);
+        if(cp) archive(cp);
+        var id=uid();
+        S.programs.push({id:id,name:name,current:true,originId:id,run:1,createdTs:Date.now(),workouts:[]});
+        save();
+        nav=[{t:'home'},{t:'prog',id:id},{t:'pedit',id:id}];
+        render(); toTop();
+      };
+      if(act) askConfirm({title:'Идёт тренировка',text:'Завершить её и создать новую программу?',ok:'Завершить и создать',cb:go});
+      else go();
     }});
   },
   repeat:function(d){
     var p=progById(d.id);
     if(!p||p.current) return;
-    var cp=curProg();
-    var msg='Начать заниматься по программе «'+p.name+'» снова?'+(cp?' Текущая программа «'+cp.name+'» будет завершена.':'');
-    if(!confirm(msg)) return;
-    var act=S.sessions.find(function(s){return !s.done});
-    if(act) finishSession(act);
-    if(cp) archive(cp);
-    var id=uid(), origin=p.originId||p.id;
-    var run=S.programs.filter(function(x){return (x.originId||x.id)===origin}).reduce(function(m,x){return Math.max(m,x.run||1)},1)+1;
-    S.programs.push({
-      id:id,name:p.name,current:true,originId:origin,run:run,createdTs:Date.now(),
-      workouts:p.workouts.map(function(w){
-        return {id:uid(),name:w.name,exercises:w.exercises.map(function(e){return {id:uid(),name:e.name,step:e.step,tstep:e.tstep,type:e.type}})};
-      })
-    });
-    save();
-    nav=[{t:'home'},{t:'prog',id:id}];
-    render(); toTop(); toast('Программа начата заново');
+    var cp0=curProg();
+    askConfirm({title:'Начать заново?',text:'Начать заниматься по программе «'+p.name+'» снова?'+(cp0?' Текущая программа «'+cp0.name+'» будет завершена.':''),ok:'Начать',cb:function(){
+      var cp=curProg();
+      var act=S.sessions.find(function(s){return !s.done});
+      if(act) finishSession(act);
+      if(cp) archive(cp);
+      var id=uid(), origin=p.originId||p.id;
+      var run=S.programs.filter(function(x){return (x.originId||x.id)===origin}).reduce(function(m,x){return Math.max(m,x.run||1)},1)+1;
+      S.programs.push({
+        id:id,name:p.name,current:true,originId:origin,run:run,createdTs:Date.now(),
+        workouts:p.workouts.map(function(w){
+          return {id:uid(),name:w.name,exercises:w.exercises.map(function(e){return {id:uid(),name:e.name,step:e.step,tstep:e.tstep,type:e.type}})};
+        })
+      });
+      save();
+      nav=[{t:'home'},{t:'prog',id:id}];
+      render(); toTop(); toast('Программа начата заново');
+    }});
   },
   pdel:function(){
     var p=progById(cur().id); if(!p) return;
-    if(!confirm('Удалить программу «'+p.name+'» вместе со всей её историей?')) return;
-    S.programs=S.programs.filter(function(x){return x.id!==p.id});
-    S.sessions=S.sessions.filter(function(s){return s.programId!==p.id});
-    save(); nav=[{t:'home'}]; render(); toTop();
+    askConfirm({title:'Удалить программу?',text:'«'+p.name+'» будет удалена вместе со всей её историей.',ok:'Удалить',danger:true,cb:function(){
+      S.programs=S.programs.filter(function(x){return x.id!==p.id});
+      S.sessions=S.sessions.filter(function(s){return s.programId!==p.id});
+      save(); nav=[{t:'home'}]; render(); toTop();
+    }});
   },
 
   // тренировки
@@ -1569,15 +1598,20 @@ var A={
     var p=progById(d.p);
     if(!p||!p.current) return;
     var act=S.sessions.find(function(s){return !s.done});
+    var go=function(){
+      var a2=S.sessions.find(function(s){return !s.done});
+      if(a2) finishSession(a2);
+      var wk=p.workouts.find(function(w){return w.id===d.id});
+      if(!wk) return;
+      var ses={id:uid(),programId:p.id,workoutId:wk.id,name:wk.name,date:today(),ts:Date.now(),done:false,entries:{}};
+      S.sessions.push(ses); save(); openSession(ses.id);
+    };
     if(act){
       if(act.programId===p.id&&act.workoutId===d.id){openSession(act.id);return;}
-      if(!confirm('Сейчас идёт другая тренировка. Завершить её и начать эту?')) return;
-      finishSession(act);
+      askConfirm({title:'Идёт другая тренировка',text:'Завершить её и начать эту?',ok:'Завершить и начать',cb:go});
+      return;
     }
-    var wk=p.workouts.find(function(w){return w.id===d.id});
-    if(!wk) return;
-    var ses={id:uid(),programId:p.id,workoutId:wk.id,name:wk.name,date:today(),ts:Date.now(),done:false,entries:{}};
-    S.sessions.push(ses); save(); openSession(ses.id);
+    go();
   },
   resume:function(d){openSession(d.id);},
   opensession:function(d){openSession(d.id);},
@@ -1604,9 +1638,10 @@ var A={
   },
   delsession:function(){
     var s=curSes(); if(!s) return;
-    if(!confirm('Удалить эту тренировку?')) return;
-    S.sessions=S.sessions.filter(function(x){return x.id!==s.id});
-    save(); if(s.done&&nav.length>1) nav.pop(); else nav=[{t:'home'}]; render(); toTop();
+    askConfirm({title:s.done?'Удалить тренировку?':'Отменить тренировку?',text:s.done?'Запись этой тренировки будет удалена.':'Записанные подходы будут удалены.',ok:s.done?'Удалить':'Отменить тренировку',danger:true,cb:function(){
+      S.sessions=S.sessions.filter(function(x){return x.id!==s.id});
+      save(); if(s.done&&nav.length>1) nav.pop(); else nav=[{t:'home'}]; render(); toTop();
+    }});
   },
 
   openex:function(d){
@@ -1797,11 +1832,14 @@ var A={
     if(!q) return;
     if(libFind(q)){toast('Такое уже есть в базе');return;}
     var sim=S.lib.find(function(l){return simil(l.name,q)});
-    if(sim&&!confirm('Похоже на «'+sim.name+'», оно уже есть в базе. Всё равно создать новое «'+q+'»?')) return;
-    var l=createLib(q,d.tp,newStep,newTStep); newStep=1; newTStep=15;
-    if(v.t==='expick'){var w=wkOf(v); if(w) w.exercises.push(mkEx(l));}
-    save(); exq=''; var inp=document.getElementById('exq'); if(inp) inp.value='';
-    refreshPick(); toast(v.t==='expick'?'Создано и добавлено':'Создано');
+    var go=function(){
+      var l=createLib(q,d.tp,newStep,newTStep); newStep=1; newTStep=15;
+      if(v.t==='expick'){var w=wkOf(v); if(w) w.exercises.push(mkEx(l));}
+      save(); exq=''; var inp=document.getElementById('exq'); if(inp) inp.value='';
+      refreshPick(); toast(v.t==='expick'?'Создано и добавлено':'Создано');
+    };
+    if(sim) askConfirm({title:'Похожее упражнение',text:'Похоже на «'+sim.name+'», оно уже есть в базе. Всё равно создать новое «'+q+'»?',ok:'Создать новое',cb:go});
+    else go();
   },
   newstep:function(d){newStep=parseNum(d.v)||1; refreshPick();},
   newtstep:function(d){newTStep=parseNum(d.v)||15; refreshPick();},
@@ -1816,22 +1854,25 @@ var A={
   libdel:function(){
     var l=S.lib.find(function(x){return x.id===cur().id}); if(!l) return;
     var u=libUse(l); if(u.progs||u.sess) return;
-    if(!confirm('Удалить «'+l.name+'» из базы?')) return;
-    S.lib=S.lib.filter(function(x){return x!==l}); save(); nav.pop(); render(); toTop();
+    askConfirm({title:'Удалить из базы?',text:'«'+l.name+'» будет удалено из базы упражнений.',ok:'Удалить',danger:true,cb:function(){
+      S.lib=S.lib.filter(function(x){return x!==l}); save(); nav.pop(); render(); toTop();
+    }});
   },
   exup:function(d){moveEx(d.id,-1);},
   exdown:function(d){moveEx(d.id,1);},
   exdel:function(d){
     var w=wkOf(cur()); if(!w) return;
-    if(!confirm('Удалить упражнение из тренировки? Записанная история останется.')) return;
-    w.exercises=w.exercises.filter(function(e){return e.id!==d.id}); save(); render();
+    askConfirm({title:'Удалить упражнение?',text:'Оно уйдёт из тренировки. Записанная история останется.',ok:'Удалить',danger:true,cb:function(){
+      w.exercises=w.exercises.filter(function(e){return e.id!==d.id}); save(); render();
+    }});
   },
   wdel:function(){
     var v=cur(), p=progById(v.p); if(!p) return;
-    if(!confirm('Удалить тренировку вместе с её историей?')) return;
-    p.workouts=p.workouts.filter(function(w){return w.id!==v.id});
-    S.sessions=S.sessions.filter(function(s){return !(s.programId===p.id&&s.workoutId===v.id)});
-    save(); nav.pop(); render(); toTop();
+    askConfirm({title:'Удалить тренировку?',text:'Тренировка будет удалена вместе с её историей.',ok:'Удалить',danger:true,cb:function(){
+      p.workouts=p.workouts.filter(function(w){return w.id!==v.id});
+      S.sessions=S.sessions.filter(function(s){return !(s.programId===p.id&&s.workoutId===v.id)});
+      save(); nav.pop(); render(); toTop();
+    }});
   }
 };
 function moveEx(id,dir){
@@ -1905,24 +1946,28 @@ document.addEventListener('change',function(e){
   }
   if(k==='exname'){
     var ex0=exById(t.dataset.id);
-    if(ex0){renameEx(ex0.name,t.value); render();}
+    if(ex0){renameEx(ex0.name,t.value,function(){render();});}
   }
   if(k==='libname'){
     var l0=S.lib.find(function(x){return x.id===cur().id});
-    if(l0){var r0=renameEx(l0.name,t.value); if(r0) cur().id=r0.id; render();}
+    if(l0){renameEx(l0.name,t.value,function(r0){ if(r0) cur().id=r0.id; render(); });}
   }
   if(t.id==='file'&&t.files&&t.files[0]){
     var rd=new FileReader();
     rd.onload=function(){
+      var d=null;
       try{
-        var d=JSON.parse(rd.result);
+        d=JSON.parse(rd.result);
         if(!valid(d)) throw new Error('bad');
-        if(!confirm('Заменить текущие данные данными из файла?')) return;
-        d=migrate(d); d.settings=d.settings||{rest:90}; syncLib(d);
-        d.settings.lastBackup=Date.now(); delete d.settings.bkSnooze;
-        S=d; save(); nav=[{t:'home'}]; modal=null; render(); toTop(); toast('Данные загружены');
-      }catch(err){toast('Не удалось прочитать файл');}
+      }catch(err){toast('Не удалось прочитать файл'); t.value=''; return;}
       t.value='';
+      askConfirm({title:'Заменить данные?',text:'Текущие данные будут заменены данными из файла.',ok:'Заменить',danger:true,cb:function(){
+        try{
+          d=migrate(d); d.settings=d.settings||{rest:90}; syncLib(d);
+          d.settings.lastBackup=Date.now(); delete d.settings.bkSnooze;
+          S=d; save(); nav=[{t:'home'}]; modal=null; render(); toTop(); toast('Данные загружены');
+        }catch(err){toast('Не удалось прочитать файл');}
+      }});
     };
     rd.readAsText(t.files[0]);
   }
