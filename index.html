@@ -203,6 +203,23 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .hint{color:var(--amber);font-size:15px;margin:4px 4px 10px}
 .inw{color:var(--accent);font-weight:700}
 
+/* календарь */
+.cal{padding:14px}
+.calhead{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.calhead b{flex:1;text-align:center;font-size:19px;font-weight:800;letter-spacing:-.2px}
+.calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.calwd{text-align:center;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;padding:6px 0 4px}
+.calday{border:0;background:none;border-radius:14px;min-height:52px;padding:6px 0 4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:17px;font-weight:600;font-variant-numeric:tabular-nums;transition:transform .08s,background .12s}
+.calday:active{transform:scale(.94)}
+.calday.today{color:var(--accent);font-weight:800}
+.calday.sel{background:var(--card2);box-shadow:inset 0 0 0 2px var(--accent)}
+.dd{display:flex;gap:3px;height:6px}
+.dd i{display:block;width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px rgba(200,245,58,.5)}
+.dd i.act{background:var(--amber);box-shadow:0 0 6px rgba(255,176,46,.5)}
+.calsum{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;color:var(--muted);font-size:15px}
+.calsum b{color:var(--text)}
+.calsum .btn.sm{min-height:40px;font-size:15px;padding:0 14px}
+
 #toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#f3f5f9;color:#0b0d11;padding:11px 18px;border-radius:999px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .2s;z-index:20;white-space:nowrap}
 #toast.on{opacity:1}
 </style>
@@ -784,8 +801,55 @@ function vSession(v){
   return h;
 }
 
+function sesItem(s){
+  var p=progById(s.programId);
+  var n=Object.keys(s.entries).reduce(function(a,k){return a+s.entries[k].sets.length},0);
+  var dur=(s.t0&&s.t1)?fmtDurShort(s.t1-s.t0):'';
+  return '<button class="item" data-a="opensession" data-id="'+s.id+'"><div class="title">'+esc(s.name||'Тренировка')+'</div>'+
+     '<div class="small">'+fmtDate(s.date)+' · '+n+' подх.'+(dur?' · '+dur:'')+(s.done?'':' · идёт')+(p?' · '+esc(p.name)+((p.run||1)>1?' (повтор '+p.run+')':''):'')+'</div></button>';
+}
+
+/* календарь: дни с тренировками отмечены точками */
+var MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+var MONTHS_G=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+var calM=null, calSel=null;   // calM — {y,m} показанный месяц, calSel — выбранный день «ГГГГ-ММ-ДД»
+function calInit(){
+  if(calM) return;
+  var t=today().split('-'); calM={y:+t[0],m:+t[1]-1}; calSel=today();
+}
+function vCal(){
+  calInit();
+  var by={}, inMonth=0, pre=calM.y+'-'+pad(calM.m+1)+'-';
+  S.sessions.forEach(function(s){
+    if(!s.date) return;
+    (by[s.date]||(by[s.date]=[])).push(s);
+    if(s.date.indexOf(pre)===0) inMonth++;
+  });
+  var first=new Date(calM.y,calM.m,1), lead=(first.getDay()+6)%7, days=new Date(calM.y,calM.m+1,0).getDate(), td=today();
+  var h='<div class="card cal"><div class="calhead"><button class="back" data-a="calnav" data-d="-1" aria-label="Предыдущий месяц">'+ic('back')+'</button>'+
+    '<b>'+MONTHS[calM.m]+' '+calM.y+'</b><button class="back" data-a="calnav" data-d="1" aria-label="Следующий месяц">'+ic('chev')+'</button></div>'+
+    '<div class="calgrid">'+['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(function(x){return '<div class="calwd">'+x+'</div>'}).join('');
+  for(var i=0;i<lead;i++) h+='<div></div>';
+  for(var d=1;d<=days;d++){
+    var ds=pre+pad(d), ss=by[ds]||[];
+    h+='<button class="calday'+(ds===td?' today':'')+(ds===calSel?' sel':'')+'" data-a="calday" data-d="'+ds+'"'+
+       ' aria-label="'+d+' '+MONTHS_G[calM.m]+(ss.length?', тренировок: '+ss.length:'')+'">'+d+
+       '<span class="dd">'+ss.slice(0,3).map(function(s){return '<i'+(s.done?'':' class="act"')+'></i>'}).join('')+'</span></button>';
+  }
+  h+='</div><div class="calsum"><span>'+(inMonth?'Тренировок в месяце: <b>'+inMonth+'</b>':'В этом месяце тренировок нет')+'</span>'+
+     ((calSel!==td||calM.y+'-'+pad(calM.m+1)!==td.slice(0,7))?'<button class="btn sm" data-a="caltoday">Сегодня</button>':'')+'</div></div>';
+  if(calSel){
+    var p=calSel.split('-'), sel=(by[calSel]||[]).slice().sort(function(a,b){return a.ts-b.ts});
+    h+='<div class="gh">'+(+p[2])+' '+MONTHS_G[+p[1]-1]+(calSel===td?' · сегодня':'')+'</div>';
+    if(sel.length) sel.forEach(function(s){h+=sesItem(s)});
+    else h+='<div class="small">В этот день тренировок нет.</div>';
+  }
+  return h;
+}
+
 function vHistory(){
-  var h='<h1>История</h1><div class="seg"><button class="'+(hseg==='s'?'on':'')+'" data-a="hseg" data-v="s">Тренировки</button><button class="'+(hseg==='e'?'on':'')+'" data-a="hseg" data-v="e">Упражнения</button></div>';
+  var h='<h1>История</h1><div class="seg s3"><button class="'+(hseg==='s'?'on':'')+'" data-a="hseg" data-v="s">Тренировки</button><button class="'+(hseg==='e'?'on':'')+'" data-a="hseg" data-v="e">Упражнения</button><button class="'+(hseg==='c'?'on':'')+'" data-a="hseg" data-v="c">Календарь</button></div>';
+  if(hseg==='c') return h+vCal();
   if(hseg==='s'){
     var list=S.sessions.slice().sort(function(a,b){
       var da=a.date||'', db=b.date||'';
@@ -793,13 +857,7 @@ function vHistory(){
       return b.ts-a.ts;
     });
     if(!list.length) h+='<div class="small">Здесь появятся ваши тренировки.</div>';
-    list.forEach(function(s){
-      var p=progById(s.programId);
-      var n=Object.keys(s.entries).reduce(function(a,k){return a+s.entries[k].sets.length},0);
-      var dur=(s.t0&&s.t1)?fmtDurShort(s.t1-s.t0):'';
-      h+='<button class="item" data-a="opensession" data-id="'+s.id+'"><div class="title">'+esc(s.name||'Тренировка')+'</div>'+
-         '<div class="small">'+fmtDate(s.date)+' · '+n+' подх.'+(dur?' · '+dur:'')+(s.done?'':' · идёт')+(p?' · '+esc(p.name)+((p.run||1)>1?' (повтор '+p.run+')':''):'')+'</div></button>';
-    });
+    list.forEach(function(s){h+=sesItem(s)});
   } else {
     var map={};
     sessionsSorted().forEach(function(s){
@@ -1196,6 +1254,9 @@ var A={
   go:function(d){exq='';nav.push(JSON.parse(d.v));render();toTop();},
   back:function(){exq='';if(nav.length>1)nav.pop();render();toTop();},
   hseg:function(d){hseg=d.v;render();},
+  calday:function(d){calSel=d.d;render();},
+  calnav:function(d){calInit(); var t=new Date(calM.y,calM.m+(+d.d),1); calM={y:t.getFullYear(),m:t.getMonth()}; render();},
+  caltoday:function(){calM=null; calInit(); render();},
 
   // программы
   padd:function(){
