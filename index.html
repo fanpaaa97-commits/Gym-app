@@ -42,12 +42,13 @@ button{touch-action:manipulation;cursor:pointer;-webkit-user-select:none;user-se
 .small{color:var(--muted);font-size:15px;margin:2px 0 12px}
 .small.nm{margin-bottom:0}
 
-.btn{display:flex;align-items:center;justify-content:center;width:100%;border:0;border-radius:16px;min-height:56px;padding:0 16px;background:var(--card2);font-size:18px;font-weight:600;box-shadow:0 1px 0 rgba(255,255,255,.05) inset;transition:transform .08s,filter .12s}
+.btn{display:flex;align-items:center;justify-content:center;width:100%;border:0;border-radius:16px;min-height:52px;padding:0 16px;background:var(--card2);font-size:17px;font-weight:600;box-shadow:0 1px 0 rgba(255,255,255,.05) inset;transition:transform .08s,filter .12s}
 .btn:active{filter:brightness(1.3);transform:scale(.98)}
 button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .btn.primary{background:linear-gradient(180deg,#d4fa56,#bdee26);color:var(--on-accent);box-shadow:0 1px 0 rgba(255,255,255,.35) inset,0 6px 18px rgba(200,245,58,.18)}
 .btn.danger{color:var(--danger)}
 .btn.big{min-height:76px;font-size:22px;margin-top:16px}
+.btn.cta{min-height:50px;font-size:17px;margin-top:12px;border-radius:14px}
 .btn.sm{min-height:48px;width:auto;padding:0 16px}
 .logrow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:10px;margin-top:16px}
 .logrow .btn.big{margin-top:0}
@@ -614,7 +615,7 @@ function wordsHtml(){
        '<div class="row2"><button class="btn k'+(v==='k'?' sel':'')+'" data-a="wsel" data-k="'+esc(k)+'" data-v="k">Знаю</button>'+
        '<button class="btn r'+(v==='r'?' sel':'')+'" data-a="wsel" data-k="'+esc(k)+'" data-v="r">Повторить</button></div></div>';
   });
-  return h+'<button class="btn primary big" data-a="modalok">Готово</button></div></div>';
+  return h+'<button class="btn primary cta" data-a="modalok">Готово</button></div></div>';
 }
 function modalHtml(){
   if(modal.words) return wordsHtml();
@@ -624,7 +625,7 @@ function modalHtml(){
   return '<div class="modal"><div class="mcard"><div class="small nm">Тренировка завершена</div>'+
     '<div class="title" style="margin-bottom:8px">'+esc(s.name||'Тренировка')+'</div>'+
     (statsHtml(s)||'<div class="stat"><div class="sv">Записано подходов: <b>'+n+'</b></div></div>')+
-    '<button class="btn primary big" data-a="modalok">'+((WS().on&&pickWords().length)?'Дальше':'Готово')+ic('check','r')+'</button></div></div>';
+    '<button class="btn primary cta" data-a="modalok">'+((WS().on&&pickWords().length)?'Дальше':'Готово')+ic('check','r')+'</button></div></div>';
 }
 
 function initDraft(ses,exId){
@@ -714,13 +715,13 @@ function vProg(v){
     h+='<div class="card"><div class="title">'+esc(w.name)+'</div>'+
        '<div class="dots" style="margin:10px 0 6px">'+dotsHtml(n)+'</div>'+
        '<div class="small nm">'+w.exercises.length+' упр. · сделано раз: '+n+(last?' · последняя '+fmtDate(last):'')+'</div>'+
-       (p.current?'<button class="btn primary big" style="margin-top:14px" data-a="start" data-p="'+p.id+'" data-id="'+w.id+'">'+(isAct?'Продолжить':'Начать')+'</button>':'')+
+       (p.current?'<button class="btn primary cta" data-a="start" data-p="'+p.id+'" data-id="'+w.id+'">'+(isAct?'Продолжить':'Начать')+'</button>':'')+
        '</div>';
   });
   if(p.current){
     h+='<button class="btn" '+goAttr({t:'pedit',id:p.id})+'>Изменить программу</button>';
   } else {
-    h+='<button class="btn primary big" data-a="repeat" data-id="'+p.id+'">'+ic('repeat')+'Повторить программу</button>'+
+    h+='<button class="btn primary cta" data-a="repeat" data-id="'+p.id+'">'+ic('repeat')+'Повторить программу</button>'+
        '<button class="btn" style="margin-top:12px" '+goAttr({t:'pedit',id:p.id})+'>Изменить</button>';
   }
   return h;
@@ -794,9 +795,9 @@ function vSession(v){
   });
   if(!exs.length) h+='<div class="card"><div class="small nm">В этой тренировке нет упражнений. Добавьте их через «Изменить программу».</div></div>';
   if(ses.done){
-    h+='<button class="btn primary big" data-a="back">Готово</button><button class="btn danger" style="margin-top:12px" data-a="delsession">Удалить тренировку</button>';
+    h+='<button class="btn primary cta" data-a="back">Готово</button><button class="btn danger" style="margin-top:12px" data-a="delsession">Удалить тренировку</button>';
   } else {
-    h+='<button class="btn primary big" data-a="finish">Завершить тренировку</button><button class="btn danger" style="margin-top:12px" data-a="delsession">Отменить тренировку</button>';
+    h+='<button class="btn primary cta" data-a="finish">Завершить тренировку</button><button class="btn danger" style="margin-top:12px" data-a="delsession">Отменить тренировку</button>';
   }
   return h;
 }
@@ -1448,7 +1449,7 @@ var A={
       save();
     }
     render();
-    var el=next?document.querySelector('.ex.open'):(document.querySelector('[data-a=finish]')||document.querySelector('.btn.big[data-a=back]'));
+    var el=next?document.querySelector('.ex.open'):(document.querySelector('[data-a=finish]')||document.querySelector('.btn.cta[data-a=back]'));
     if(el&&el.scrollIntoView) el.scrollIntoView({block:next?'start':'center',behavior:'smooth'});
   },
   rest:function(d){
