@@ -15,9 +15,12 @@
 <style>
 :root{--bg:#0b0d11;--card:#161920;--card2:#222733;--line:#262c39;--text:#f3f5f9;--muted:#8d95a8;--accent:#c8f53a;--accent-soft:rgba(200,245,58,.12);--on-accent:#12150a;--danger:#ff6b6b;--amber:#ffb02e;--r:20px;--shadow:0 1px 0 rgba(255,255,255,.04) inset,0 8px 24px rgba(0,0,0,.28)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html{background:var(--bg);color-scheme:dark}
-body{margin:0;background:radial-gradient(120% 60% at 50% -10%,rgba(200,245,58,.07),transparent 60%) no-repeat,var(--bg);background-attachment:fixed;color:var(--text);font:17px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;-webkit-text-size-adjust:100%;overscroll-behavior-y:none}
-#app{max-width:520px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) 16px calc(104px + env(safe-area-inset-bottom))}
+html{background:var(--bg);color-scheme:dark;height:100%}
+/* каркас: прокручивается #scroll, меню #tabs — обычный элемент внизу колонки (не fixed: на iPhone fixed-меню «плавало») */
+body{margin:0;height:100%;height:100dvh;overflow:hidden;display:flex;flex-direction:column;background:radial-gradient(120% 60% at 50% -10%,rgba(200,245,58,.07),transparent 60%) no-repeat,var(--bg);color:var(--text);font:17px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;-webkit-text-size-adjust:100%;overscroll-behavior-y:none}
+#scroll{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+#app{max-width:520px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) 16px 28px}
+body.notabs #app{padding-bottom:calc(28px + env(safe-area-inset-bottom))}
 h1{font-size:32px;font-weight:800;margin:6px 0 16px;letter-spacing:-.8px}
 .ic{width:1.25em;height:1.25em;flex:none;display:inline-block;vertical-align:-.22em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
 .ic.lg{width:28px;height:28px}
@@ -57,7 +60,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
 
 /* tabs */
-#tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:rgba(17,20,26,.88);-webkit-backdrop-filter:blur(20px) saturate(1.4);backdrop-filter:blur(20px) saturate(1.4);padding:6px 10px calc(6px + env(safe-area-inset-bottom));border-top:1px solid var(--line);z-index:10}
+#tabs{flex:none;display:flex;background:#11141a;padding:6px 10px calc(6px + env(safe-area-inset-bottom));border-top:1px solid var(--line);z-index:10}
 #tabs button{flex:1;background:none;border:0;min-height:56px;font-size:12px;font-weight:600;letter-spacing:.02em;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transition:color .15s}
 #tabs button .ic{width:26px;height:26px;padding:3px 14px;box-sizing:content-box;border-radius:999px;transition:background .15s,color .15s}
 #tabs button.on{color:var(--accent)}
@@ -226,7 +229,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 </style>
 </head>
 <body>
-<div id="app"></div>
+<div id="scroll"><div id="app"></div></div>
 <nav id="tabs">
   <button data-a="tab" data-t="home"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/></svg>Программы</button>
   <button data-a="tab" data-t="history"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg>История</button>
@@ -1070,12 +1073,13 @@ function render(){
   document.getElementById('app').innerHTML=html;
   var v2=cur();
   document.getElementById('tabs').style.display=(v2.t==='session')?'none':'flex';
+  document.body.classList.toggle('notabs',v2.t==='session');
   var tab=nav[0].t;
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'),function(b){b.classList.toggle('on',b.dataset.t===tab)});
   wake(v2.t==='session');
   tick();
 }
-var toTop=function(){window.scrollTo(0,0)};
+var toTop=function(){var s=document.getElementById('scroll'); if(s) s.scrollTop=0;};
 
 /* ---------- timer / sound / wake ---------- */
 var actx=null, beepAudio=null, audioReady=false, unlocking=false;
