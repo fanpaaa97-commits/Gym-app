@@ -1175,28 +1175,58 @@ function dragEnd(cancelled){
   }
   setTimeout(fin,dur+250);   // страховка
 }
-document.addEventListener('touchstart',function(e){
-  if(drag){return;}
+// Важно: жест может начаться на карточке или кнопке, а при старте жеста экран перерисовывается и этот элемент удаляется.
+// iOS после этого шлёт события движения пальца только удалённому элементу, до document они не доходят (жест «замирал»).
+// Поэтому слушаем события и на самом элементе, где начался жест; одно и то же событие обрабатываем один раз.
+var tEl=null, lastEv=null, lastTouchT=0;
+function seen(e){ if(lastEv===e) return true; lastEv=e; lastTouchT=Date.now(); return false; }
+function unbindTouch(){
+  if(!tEl) return;
+  tEl.removeEventListener('touchmove',onTM); tEl.removeEventListener('touchend',onTE); tEl.removeEventListener('touchcancel',onTC);
+  tEl=null;
+}
+function onTS(e){
+  lastTouchT=Date.now();
+  unbindTouch();
+  if(drag){ if(!drag.fin) dragEnd(true); return; }
   var t=e.touches[0];
   pend=(e.touches.length===1&&nav.length>1&&!modal&&!e.target.closest('input,textarea,select,.modal'))?{x:t.clientX,y:t.clientY}:null;
-},{passive:true});
-document.addEventListener('touchmove',function(e){
+  if(pend){
+    tEl=e.target;
+    tEl.addEventListener('touchmove',onTM,{passive:false});
+    tEl.addEventListener('touchend',onTE,{passive:true});
+    tEl.addEventListener('touchcancel',onTC,{passive:true});
+  }
+}
+function onTM(e){
+  if(seen(e)) return;
   if(e.touches.length>1){ if(drag) dragEnd(true); pend=null; return; }
   var t=e.touches[0];
-  if(drag){ if(!drag.fin){ e.preventDefault(); dragMove(t.clientX); } return; }
+  if(drag){ if(!drag.fin){ if(e.cancelable) e.preventDefault(); dragMove(t.clientX); } return; }
   if(!pend||!canAnim()) return;
   var dx=t.clientX-pend.x, dy=t.clientY-pend.y;
-  if(Math.abs(dy)>10&&Math.abs(dy)>Math.abs(dx)){ pend=null; return; }      // это вертикальная прокрутка
-  if(dx>10&&dx>Math.abs(dy)*1.2){ e.preventDefault(); dragStart(pend.x+10); dragMove(t.clientX); pend=null; }
-},{passive:false});
-document.addEventListener('touchend',function(e){
-  if(drag){ dragEnd(false); pend=null; return; }
-  var s=pend; pend=null;
+  if(Math.abs(dy)>10&&Math.abs(dy)>Math.abs(dx)){ pend=null; unbindTouch(); return; }      // это вертикальная прокрутка
+  if(dx>10&&dx>Math.abs(dy)*1.2){ if(e.cancelable) e.preventDefault(); dragStart(pend.x+10); dragMove(t.clientX); pend=null; }
+}
+function onTE(e){
+  if(seen(e)) return;
+  var s=pend; pend=null; unbindTouch();
+  if(drag){ dragEnd(false); return; }
   if(!s||modal||nav.length<2||canAnim()) return;     // без анимации (например «уменьшить движение») — обычный свайп
   var t=e.changedTouches[0], dx=t.clientX-s.x, dy=t.clientY-s.y;
   if(dx>90&&Math.abs(dy)<dx*0.4) A.back();
-},{passive:true});
-document.addEventListener('touchcancel',function(){ if(drag) dragEnd(true); pend=null; },{passive:true});
+}
+function onTC(e){
+  if(seen(e)) return;
+  pend=null; unbindTouch();
+  if(drag) dragEnd(true);
+}
+document.addEventListener('touchstart',onTS,{passive:true});
+document.addEventListener('touchmove',onTM,{passive:false});
+document.addEventListener('touchend',onTE,{passive:true});
+document.addEventListener('touchcancel',onTC,{passive:true});
+// страховка: если жест «потерялся» (события перестали приходить), возвращаем экран на место
+setInterval(function(){ if(drag&&!drag.fin&&Date.now()-lastTouchT>1500) dragEnd(true); },500);
 
 /* ---------- timer / sound / wake ---------- */
 var actx=null, beepAudio=null, audioReady=false, unlocking=false;
