@@ -15,14 +15,16 @@
 <style>
 :root{--bg:#0b0d11;--card:#161920;--card2:#222733;--line:#262c39;--text:#f3f5f9;--muted:#8d95a8;--accent:#c8f53a;--accent-soft:rgba(200,245,58,.12);--on-accent:#12150a;--danger:#ff6b6b;--amber:#ffb02e;--r:20px;--shadow:0 1px 0 rgba(255,255,255,.04) inset,0 8px 24px rgba(0,0,0,.28)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html{background:var(--bg);color-scheme:dark}
+html{background:radial-gradient(120% 60% at 50% -10%,rgba(200,245,58,.07),transparent 60%) no-repeat,var(--bg);color-scheme:dark}
 /* min-height: страница всегда чуть выше экрана (--full задаёт скрипт для iPhone-приложения),
    иначе iOS укорачивает область снизу на коротких экранах и под меню остаётся пробел */
-body{margin:0;min-height:var(--full,calc(100vh + 2px));background:radial-gradient(120% 60% at 50% -10%,rgba(200,245,58,.07),transparent 60%) no-repeat,var(--bg);color:var(--text);font:17px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;-webkit-text-size-adjust:100%;overscroll-behavior-y:none}
+body{margin:0;min-height:var(--full,calc(100vh + 2px));overflow-x:hidden;touch-action:pan-y;color:var(--text);font:17px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;-webkit-text-size-adjust:100%;overscroll-behavior-y:none}
 #app{max-width:520px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) 16px calc(104px + env(safe-area-inset-bottom))}
 /* «призрак» уходящего экрана при переходе назад */
 .ghost{position:fixed;inset:0;z-index:8;overflow:hidden;pointer-events:none;will-change:transform;background:radial-gradient(120% 60% at 50% -10%,rgba(200,245,58,.07),transparent 60%) no-repeat,var(--bg);box-shadow:-14px 0 32px rgba(0,0,0,.55)}
 .ghost .gin{max-width:520px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) 16px calc(104px + env(safe-area-inset-bottom))}
+.ghost.under{z-index:-1;box-shadow:none;background:none}   /* уходящий экран под новым при переходе вперёд */
+#app.top{position:relative;min-height:var(--full,100vh);background:radial-gradient(120% 60% at 50% -10%,rgba(200,245,58,.07),transparent 60%) no-repeat,var(--bg);box-shadow:-14px 0 32px rgba(0,0,0,.55)}   /* выезжающий экран */
 h1{font-size:32px;font-weight:800;margin:6px 0 16px;letter-spacing:-.8px}
 .ic{width:1.25em;height:1.25em;flex:none;display:inline-block;vertical-align:-.22em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
 .ic.lg{width:28px;height:28px}
@@ -1069,32 +1071,132 @@ function viewFor(v){
   return vHome();
 }
 
+/* ---------- переходы между экранами как в iOS ---------- */
+// «призрак» — снимок экрана в виде отдельного слоя: при «Назад» он едет поверх, при переходе вперёд остаётся под новым
+var noAnim=false, renderedLen=1, renderedTab='home';
+var EASE='cubic-bezier(.22,.8,.24,1)', DUR=340, PAR=26;   // PAR — на сколько % сдвигается нижний экран (параллакс)
+var canAnim=function(){
+  var a=document.getElementById('app');
+  return !(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)&&!document.hidden&&!!a&&!!a.animate;
+};
+function makeGhost(app,cls){
+  Array.prototype.forEach.call(document.querySelectorAll('.ghost'),function(x){x.remove()});
+  var g=document.createElement('div'); g.className='ghost'+(cls?' '+cls:'');
+  g.innerHTML='<div class="gin" style="transform:translateY(-'+(window.scrollY||0)+'px)">'+app.innerHTML.replace(/ id="[^"]*"/g,'')+'</div>';
+  document.body.appendChild(g);
+  return g;
+}
+// переход вперёд: новый экран выезжает справа, прежний сдвигается влево и темнеет
+function pushAnim(g,app){
+  var done=false, fin=function(){
+    if(done) return; done=true;
+    if(g.parentNode) g.remove();
+    app.classList.remove('top');
+    app.getAnimations().forEach(function(a){a.cancel()});
+  };
+  app.classList.add('top');
+  g.animate([{transform:'translateX(0)',opacity:1},{transform:'translateX(-'+PAR+'%)',opacity:.45}],{duration:DUR,easing:EASE,fill:'forwards'});
+  var a=app.animate([{transform:'translateX(100%)'},{transform:'none'}],{duration:DUR,easing:EASE});
+  a.onfinish=fin; setTimeout(fin,DUR+250);   // страховка: слой не должен остаться на экране
+}
 function render(){
+  var app=document.getElementById('app'), oldLen=renderedLen;
+  var ghost=(!noAnim&&nav.length===oldLen+1&&nav[0].t===renderedTab&&canAnim())?makeGhost(app,'under'):null;   // снимок до подмены содержимого
   var html=viewFor(cur());
   if(modal) html+=modalHtml();
-  document.getElementById('app').innerHTML=html;
-  var v2=cur();
-  document.getElementById('tabs').style.display=(v2.t==='session')?'none':'flex';  var tab=nav[0].t;
+  app.innerHTML=html;
+  var v2=cur(), tab=nav[0].t;
+  document.getElementById('tabs').style.display=(v2.t==='session')?'none':'flex';
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'),function(b){b.classList.toggle('on',b.dataset.t===tab)});
   wake(v2.t==='session');
   tick();
+  if(ghost){ if(nav.length===oldLen+1) pushAnim(ghost,app); else ghost.remove(); }
+  renderedLen=nav.length; renderedTab=nav[0].t;
 }
 var toTop=function(){window.scrollTo(0,0)};
-// переход назад как в iOS: старый экран уезжает вправо, из-под него выезжает предыдущий (с затемнением)
+// «Назад» по кнопке: старый экран уезжает вправо, из-под него выезжает предыдущий (с затемнением)
 function backAnim(change){
   var app=document.getElementById('app');
-  var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if(reduce||document.hidden||!app||!app.animate){change();return;}
-  Array.prototype.forEach.call(document.querySelectorAll('.ghost'),function(x){x.remove()});
-  var g=document.createElement('div'); g.className='ghost';
-  g.innerHTML='<div class="gin" style="transform:translateY(-'+(window.scrollY||0)+'px)">'+app.innerHTML.replace(/ id="[^"]*"/g,'')+'</div>';
-  document.body.appendChild(g);
+  if(!canAnim()){change();return;}
+  var g=makeGhost(app);
   change();
-  var opt={duration:340,easing:'cubic-bezier(.22,.8,.24,1)'};
-  g.animate([{transform:'translateX(0)'},{transform:'translateX(100%)'}],opt).onfinish=function(){g.remove()};
-  setTimeout(function(){g.remove()},opt.duration+250);   // страховка: призрак не должен остаться поверх экрана
-  app.animate([{transform:'translateX(-26%)',opacity:.45},{transform:'none',opacity:1}],opt);
+  var done=false, fin=function(){
+    if(done) return; done=true;
+    if(g.parentNode) g.remove();
+    app.getAnimations().forEach(function(a){a.cancel()});
+  };
+  var opt={duration:DUR,easing:EASE};
+  g.animate([{transform:'translateX(0)'},{transform:'translateX(100%)'}],opt).onfinish=fin;
+  app.animate([{transform:'translateX(-'+PAR+'%)',opacity:.45},{transform:'none',opacity:1}],opt);
+  setTimeout(fin,DUR+250);   // страховка: призрак не должен остаться поверх экрана
 }
+
+// «Назад» свайпом: экран едет за пальцем. Под ним сразу показывается предыдущий экран; отпустили далеко/быстро — уходим, нет — возвращаем
+var pend=null, drag=null;
+function dragStart(x0){
+  var app=document.getElementById('app'), entry=nav[nav.length-1], exq0=exq, ys=window.scrollY||0;
+  var g=makeGhost(app);
+  noAnim=true; exq=''; nav.pop(); render(); window.scrollTo(0,0); noAnim=false;
+  drag={g:g,app:app,entry:entry,exq0:exq0,ys:ys,W:window.innerWidth,x0:x0,dx:0,fin:false,samples:[]};
+  app.style.transform='translateX(-'+PAR+'%)'; app.style.opacity='.45';
+}
+function dragMove(x){
+  var d=drag, dx=Math.max(0,Math.min(d.W,x-d.x0)), p=dx/d.W, now=Date.now();
+  d.dx=dx;
+  d.g.style.transform='translateX('+dx+'px)';
+  d.app.style.transform='translateX('+(-PAR*(1-p))+'%)';
+  d.app.style.opacity=String(.45+.55*p);
+  d.samples.push({x:dx,t:now}); if(d.samples.length>8) d.samples.shift();
+}
+function dragEnd(cancelled){
+  var d=drag; if(!d||d.fin) return; d.fin=true;
+  var now=Date.now(), dx=d.dx, W=d.W, p=dx/W;
+  var s0=d.samples.find(function(s){return now-s.t<=120})||d.samples[0];
+  var v=(s0&&now>s0.t)?(dx-s0.x)/(now-s0.t):0;       // скорость пальца, px/мс
+  var go=!cancelled&&(dx>W*0.38||(v>0.45&&dx>30));
+  var dur=Math.max(150,Math.round(DUR*(go?1-p:p)));
+  var curT=-PAR*(1-p), curO=.45+.55*p, opt={duration:dur,easing:'cubic-bezier(.25,.8,.3,1)',fill:'forwards'};
+  var done=false, fin=function(){
+    if(done) return; done=true;
+    if(!go){            // отменили: возвращаем исходный экран
+      noAnim=true; nav.push(d.entry); exq=d.exq0; render(); window.scrollTo(0,d.ys); noAnim=false;
+    }
+    if(d.g.parentNode) d.g.remove();
+    d.app.style.transform=''; d.app.style.opacity='';
+    d.app.getAnimations().forEach(function(a){a.cancel()});
+    drag=null;
+  };
+  if(go){
+    d.g.animate([{transform:'translateX('+dx+'px)'},{transform:'translateX('+W+'px)'}],opt);
+    d.app.animate([{transform:'translateX('+curT+'%)',opacity:curO},{transform:'none',opacity:1}],opt).onfinish=fin;
+  } else {
+    d.g.animate([{transform:'translateX('+dx+'px)'},{transform:'translateX(0)'}],opt);
+    d.app.animate([{transform:'translateX('+curT+'%)',opacity:curO},{transform:'translateX(-'+PAR+'%)',opacity:.45}],opt).onfinish=fin;
+  }
+  setTimeout(fin,dur+250);   // страховка
+}
+document.addEventListener('touchstart',function(e){
+  if(drag){return;}
+  var t=e.touches[0];
+  pend=(e.touches.length===1&&nav.length>1&&!modal&&!e.target.closest('input,textarea,select,.modal'))?{x:t.clientX,y:t.clientY}:null;
+},{passive:true});
+document.addEventListener('touchmove',function(e){
+  if(e.touches.length>1){ if(drag) dragEnd(true); pend=null; return; }
+  var t=e.touches[0];
+  if(drag){ if(!drag.fin){ e.preventDefault(); dragMove(t.clientX); } return; }
+  if(!pend||!canAnim()) return;
+  var dx=t.clientX-pend.x, dy=t.clientY-pend.y;
+  if(Math.abs(dy)>10&&Math.abs(dy)>Math.abs(dx)){ pend=null; return; }      // это вертикальная прокрутка
+  if(dx>10&&dx>Math.abs(dy)*1.2){ e.preventDefault(); dragStart(pend.x+10); dragMove(t.clientX); pend=null; }
+},{passive:false});
+document.addEventListener('touchend',function(e){
+  if(drag){ dragEnd(false); pend=null; return; }
+  var s=pend; pend=null;
+  if(!s||modal||nav.length<2||canAnim()) return;     // без анимации (например «уменьшить движение») — обычный свайп
+  var t=e.changedTouches[0], dx=t.clientX-s.x, dy=t.clientY-s.y;
+  if(dx>90&&Math.abs(dy)<dx*0.4) A.back();
+},{passive:true});
+document.addEventListener('touchcancel',function(){ if(drag) dragEnd(true); pend=null; },{passive:true});
 
 /* ---------- timer / sound / wake ---------- */
 var actx=null, beepAudio=null, audioReady=false, unlocking=false;
@@ -1612,20 +1714,6 @@ document.addEventListener('click',function(e){
   var f=A[t.dataset.a];
   if(f) f(t.dataset,t);
 });
-
-// свайп вправо по экрану = «Назад» (уверенный горизонтальный жест, не в полях ввода и не в окнах)
-var sw0=null;
-document.addEventListener('touchstart',function(e){
-  var t=e.touches[0];
-  sw0=(e.touches.length===1&&!e.target.closest('input,textarea,select,.modal'))?{x:t.clientX,y:t.clientY,t:Date.now()}:null;
-},{passive:true});
-document.addEventListener('touchmove',function(e){if(e.touches.length>1) sw0=null;},{passive:true});
-document.addEventListener('touchend',function(e){
-  var s=sw0; sw0=null;
-  if(!s||modal||nav.length<2) return;
-  var t=e.changedTouches[0], dx=t.clientX-s.x, dy=t.clientY-s.y;
-  if(dx>90&&Math.abs(dy)<dx*0.4&&Date.now()-s.t<600) A.back();
-},{passive:true});
 
 // iPhone в режиме приложения: страница должна быть не ниже экрана (см. min-height у body)
 function fitFull(){
