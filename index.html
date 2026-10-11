@@ -23,6 +23,11 @@ body{margin:0;min-height:var(--full,calc(100vh + 2px));overflow-x:hidden;touch-a
 /* «призрак» уходящего экрана при переходе назад */
 .ghost{position:fixed;inset:0;z-index:8;overflow:hidden;pointer-events:none;will-change:transform;background:radial-gradient(120% 60% at 50% -10%,rgba(200,245,58,.07),transparent 60%) no-repeat,var(--bg);box-shadow:-14px 0 32px rgba(0,0,0,.55)}
 .ghost .gin{max-width:520px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) 16px calc(104px + env(safe-area-inset-bottom))}
+.modal.dlg{align-items:flex-start;padding-top:calc(env(safe-area-inset-top) + 9vh);z-index:40}   /* окно ввода: у верха, чтобы клавиатура не закрывала */
+.dlg .mcard{max-width:420px}
+.dlg .btn.cta{margin-top:0}
+.dlg .row2{margin-top:14px}
+.dlg .text{margin-bottom:0}
 .ghost.flat{box-shadow:none}   /* смена вкладки: экраны рядом, без тени */
 .swapwrap{position:relative;overflow:hidden;margin:0 -16px -24px;padding:0 16px 24px}   /* зона слайда внутри экрана (переключатель разделов, месяцы) */
 .swapout{position:absolute;left:16px;right:16px;top:0;pointer-events:none}
@@ -1187,6 +1192,43 @@ function render(){
 }
 var toTop=function(){window.scrollTo(0,0)};
 
+// окно ввода названия в стиле приложения (вместо системного prompt): askText({title,hint,value,ok,cb})
+function askText(o){
+  var old=document.getElementById('dlg'); if(old) old.remove();
+  var d=document.createElement('div'); d.id='dlg'; d.className='modal dlg';
+  d.innerHTML='<div class="mcard"><div class="title" style="margin-bottom:14px">'+esc(o.title)+'</div>'+
+    '<input class="text" id="dlg-in" autocomplete="off" autocapitalize="sentences" enterkeyhint="done" maxlength="60" placeholder="'+esc(o.hint||'')+'" value="'+esc(o.value||'')+'">'+
+    '<div class="row2"><button class="btn cta" data-dlg="no">Отмена</button><button class="btn primary cta" data-dlg="ok">'+esc(o.ok||'Готово')+'</button></div></div>';
+  document.body.appendChild(d);
+  var inp=d.querySelector('#dlg-in'), okb=d.querySelector('[data-dlg=ok]'), closed=false;
+  var sync=function(){okb.disabled=!inp.value.trim();};
+  var close=function(){
+    if(closed) return; closed=true;
+    inp.blur();
+    if(!canAnim()||!d.animate){d.remove();return;}
+    d.style.pointerEvents='none';
+    var mc=d.querySelector('.mcard'); d.style.animation='none'; if(mc) mc.style.animation='none';
+    d.animate([{opacity:1},{opacity:0}],{duration:180,easing:'ease-out'}).onfinish=function(){d.remove()};
+    setTimeout(function(){d.remove()},450);
+  };
+  var submit=function(){
+    var v=inp.value.trim(); if(!v) return;
+    close(); o.cb(v);
+  };
+  inp.addEventListener('input',sync);
+  inp.addEventListener('keydown',function(e){
+    if(e.key==='Enter'){e.preventDefault();submit();}
+    else if(e.key==='Escape'){close();}
+  });
+  d.addEventListener('click',function(e){
+    if(e.target.closest('[data-dlg=ok]')) submit();
+    else if(e.target.closest('[data-dlg=no]')||e.target===d) close();
+  });
+  sync();
+  inp.focus();   // сразу в обработчике нажатия, иначе iPhone не покажет клавиатуру
+  try{inp.setSelectionRange(inp.value.length,inp.value.length)}catch(e){}
+}
+
 // «Назад» свайпом: экран едет за пальцем. Под ним сразу показывается предыдущий экран; отпустили далеко/быстро — уходим, нет — возвращаем
 var pend=null, drag=null;
 function dragStart(x0){
@@ -1480,18 +1522,18 @@ var A={
 
   // программы
   padd:function(){
-    var name=prompt('Название программы','');
-    if(!name||!name.trim()) return;
-    var act=S.sessions.find(function(s){return !s.done});
-    var cp=curProg();
-    if(act&&!confirm('Сейчас идёт тренировка. Завершить её и создать новую программу?')) return;
-    if(act) finishSession(act);
-    if(cp) archive(cp);
-    var id=uid();
-    S.programs.push({id:id,name:name.trim(),current:true,originId:id,run:1,createdTs:Date.now(),workouts:[]});
-    save();
-    nav=[{t:'home'},{t:'prog',id:id},{t:'pedit',id:id}];
-    render(); toTop();
+    askText({title:'Новая программа',hint:'Название программы',ok:'Создать',cb:function(name){
+      var act=S.sessions.find(function(s){return !s.done});
+      var cp=curProg();
+      if(act&&!confirm('Сейчас идёт тренировка. Завершить её и создать новую программу?')) return;
+      if(act) finishSession(act);
+      if(cp) archive(cp);
+      var id=uid();
+      S.programs.push({id:id,name:name,current:true,originId:id,run:1,createdTs:Date.now(),workouts:[]});
+      save();
+      nav=[{t:'home'},{t:'prog',id:id},{t:'pedit',id:id}];
+      render(); toTop();
+    }});
   },
   repeat:function(d){
     var p=progById(d.id);
@@ -1734,11 +1776,11 @@ var A={
   wadd:function(){
     var v=cur(), pid=(v.t==='pedit'||v.t==='prog')?v.id:v.p;
     var p=progById(pid); if(!p) return;
-    var name=prompt('Название тренировки','');
-    if(!name||!name.trim()) return;
-    var w={id:uid(),name:name.trim(),exercises:[]};
-    p.workouts.push(w); save();
-    nav.push({t:'wedit',p:p.id,id:w.id}); render(); toTop();
+    askText({title:'Новая тренировка',hint:'Название, например «Верх А»',ok:'Создать',cb:function(name){
+      var w={id:uid(),name:name,exercises:[]};
+      p.workouts.push(w); save();
+      nav.push({t:'wedit',p:p.id,id:w.id}); render(); toTop();
+    }});
   },
   exadd:function(){
     var v=cur(); if(!wkOf(v)) return;
