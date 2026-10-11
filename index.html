@@ -20,6 +20,9 @@ html{background:var(--bg);color-scheme:dark}
    иначе iOS укорачивает область снизу на коротких экранах и под меню остаётся пробел */
 body{margin:0;min-height:var(--full,calc(100vh + 2px));background:radial-gradient(120% 60% at 50% -10%,rgba(200,245,58,.07),transparent 60%) no-repeat,var(--bg);color:var(--text);font:17px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;-webkit-text-size-adjust:100%;overscroll-behavior-y:none}
 #app{max-width:520px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) 16px calc(104px + env(safe-area-inset-bottom))}
+/* «призрак» уходящего экрана при переходе назад */
+.ghost{position:fixed;inset:0;z-index:8;overflow:hidden;pointer-events:none;will-change:transform;background:radial-gradient(120% 60% at 50% -10%,rgba(200,245,58,.07),transparent 60%) no-repeat,var(--bg);box-shadow:-14px 0 32px rgba(0,0,0,.55)}
+.ghost .gin{max-width:520px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) 16px calc(104px + env(safe-area-inset-bottom))}
 h1{font-size:32px;font-weight:800;margin:6px 0 16px;letter-spacing:-.8px}
 .ic{width:1.25em;height:1.25em;flex:none;display:inline-block;vertical-align:-.22em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
 .ic.lg{width:28px;height:28px}
@@ -1077,6 +1080,21 @@ function render(){
   tick();
 }
 var toTop=function(){window.scrollTo(0,0)};
+// переход назад как в iOS: старый экран уезжает вправо, из-под него выезжает предыдущий (с затемнением)
+function backAnim(change){
+  var app=document.getElementById('app');
+  var reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduce||document.hidden||!app||!app.animate){change();return;}
+  Array.prototype.forEach.call(document.querySelectorAll('.ghost'),function(x){x.remove()});
+  var g=document.createElement('div'); g.className='ghost';
+  g.innerHTML='<div class="gin" style="transform:translateY(-'+(window.scrollY||0)+'px)">'+app.innerHTML.replace(/ id="[^"]*"/g,'')+'</div>';
+  document.body.appendChild(g);
+  change();
+  var opt={duration:340,easing:'cubic-bezier(.22,.8,.24,1)'};
+  g.animate([{transform:'translateX(0)'},{transform:'translateX(100%)'}],opt).onfinish=function(){g.remove()};
+  setTimeout(function(){g.remove()},opt.duration+250);   // страховка: призрак не должен остаться поверх экрана
+  app.animate([{transform:'translateX(-26%)',opacity:.45},{transform:'none',opacity:1}],opt);
+}
 
 /* ---------- timer / sound / wake ---------- */
 var actx=null, beepAudio=null, audioReady=false, unlocking=false;
@@ -1256,7 +1274,11 @@ function markBackup(){
 var A={
   tab:function(d){exq='';nav=[{t:d.t}];render();toTop();},
   go:function(d){exq='';nav.push(JSON.parse(d.v));render();toTop();},
-  back:function(){exq='';if(nav.length>1)nav.pop();render();toTop();},
+  back:function(){
+    exq='';
+    var go=function(){if(nav.length>1)nav.pop();render();toTop();};
+    if(nav.length>1) backAnim(go); else go();
+  },
   hseg:function(d){hseg=d.v;render();},
   calday:function(d){calSel=d.d;render();},
   calnav:function(d){calInit(); var t=new Date(calM.y,calM.m+(+d.d),1); calM={y:t.getFullYear(),m:t.getMonth()}; render();},
@@ -1559,7 +1581,7 @@ var A={
     var l=S.lib.find(function(x){return x.id===cur().id}); if(!l) return;
     var u=libUse(l); if(u.progs||u.sess) return;
     if(!confirm('Удалить «'+l.name+'» из базы?')) return;
-    S.lib=S.lib.filter(function(x){return x!==l}); save(); nav.pop(); render(); toTop();
+    S.lib=S.lib.filter(function(x){return x!==l}); save(); backAnim(function(){nav.pop(); render(); toTop();});
   },
   exup:function(d){moveEx(d.id,-1);},
   exdown:function(d){moveEx(d.id,1);},
@@ -1573,7 +1595,7 @@ var A={
     if(!confirm('Удалить тренировку вместе с её историей?')) return;
     p.workouts=p.workouts.filter(function(w){return w.id!==v.id});
     S.sessions=S.sessions.filter(function(s){return !(s.programId===p.id&&s.workoutId===v.id)});
-    save(); nav.pop(); render(); toTop();
+    save(); backAnim(function(){nav.pop(); render(); toTop();});
   }
 };
 function moveEx(id,dir){
