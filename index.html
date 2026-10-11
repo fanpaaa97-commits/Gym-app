@@ -1077,16 +1077,17 @@ function render(){
 var toTop=function(){window.scrollTo(0,0)};
 
 /* ---------- timer / sound / wake ---------- */
-var actx=null, beepAudio=null, audioReady=false;
+var actx=null, beepAudio=null, audioReady=false, unlocking=false;
 // короткий двойной сигнал в виде WAV: HTML-аудио на iPhone играет и при включённом беззвучном режиме, в отличие от WebAudio
-function wavUrl(){
+// silent=true — тот же файл из нулей: им «будим» звук, чтобы при касании ничего не звучало
+function wavUrl(silent){
   var sr=22050, n=Math.round(sr*0.6), buf=new ArrayBuffer(44+n*2), v=new DataView(buf), i;
   var ws=function(o,t){for(var k=0;k<t.length;k++)v.setUint8(o+k,t.charCodeAt(k))};
   ws(0,'RIFF');v.setUint32(4,36+n*2,true);ws(8,'WAVEfmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);
   v.setUint32(24,sr,true);v.setUint32(28,sr*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);ws(36,'data');v.setUint32(40,n*2,true);
   for(i=0;i<n;i++){
     var t=i/sr, tt=t<0.2?t:(t>=0.3&&t<0.5?t-0.3:-1), a=0;
-    if(tt>=0) a=Math.sin(2*Math.PI*880*t)*0.7*Math.min(1,tt/0.01,(0.2-tt)/0.01);
+    if(tt>=0&&!silent) a=Math.sin(2*Math.PI*880*t)*0.7*Math.min(1,tt/0.01,(0.2-tt)/0.01);
     v.setInt16(44+i*2,Math.round(a*32767),true);
   }
   return URL.createObjectURL(new Blob([buf],{type:'audio/wav'}));
@@ -1098,12 +1099,13 @@ function unlockAudio(){
     if(C){actx=actx||new C(); if(actx.state!=='running') actx.resume();}
   }catch(e){}
   try{
-    if(!beepAudio){beepAudio=new Audio(wavUrl()); beepAudio.preload='auto';}
-    if(!audioReady){
-      beepAudio.muted=true;
+    if(!beepAudio){beepAudio=new Audio(wavUrl(true)); beepAudio.preload='auto';}
+    if(!audioReady&&!unlocking){
+      unlocking=true;
       var pr=beepAudio.play();
-      var ready=function(){beepAudio.pause();beepAudio.currentTime=0;beepAudio.muted=false;audioReady=true;};
-      if(pr&&pr.then) pr.then(ready).catch(function(){beepAudio.muted=false;}); else ready();
+      // после «пробуждения» тишиной подставляем настоящий сигнал
+      var ready=function(){beepAudio.pause();beepAudio.src=wavUrl(false);audioReady=true;unlocking=false;};
+      if(pr&&pr.then) pr.then(ready).catch(function(){unlocking=false;}); else ready();
     }
   }catch(e){}
 }
