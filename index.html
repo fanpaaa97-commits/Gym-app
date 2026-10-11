@@ -23,6 +23,10 @@ body{margin:0;min-height:var(--full,calc(100vh + 2px));overflow-x:hidden;touch-a
 /* «призрак» уходящего экрана при переходе назад */
 .ghost{position:fixed;inset:0;z-index:8;overflow:hidden;pointer-events:none;will-change:transform;background:radial-gradient(120% 60% at 50% -10%,rgba(200,245,58,.07),transparent 60%) no-repeat,var(--bg);box-shadow:-14px 0 32px rgba(0,0,0,.55)}
 .ghost .gin{max-width:520px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) 16px calc(104px + env(safe-area-inset-bottom))}
+.ghost.flat{box-shadow:none}   /* смена вкладки: экраны рядом, без тени */
+.swapwrap{position:relative;overflow:hidden;margin:0 -16px -24px;padding:0 16px 24px}   /* зона слайда внутри экрана (переключатель разделов, месяцы) */
+.swapout{position:absolute;left:16px;right:16px;top:0;pointer-events:none}
+#calwrap .card.cal{margin-bottom:0}
 .ghost.under{z-index:-1;box-shadow:none;background:none}   /* уходящий экран под новым при переходе вперёд */
 #app.pushing{position:relative;min-height:var(--full,100vh);background:radial-gradient(120% 60% at 50% -10%,rgba(200,245,58,.07),transparent 60%) no-repeat,var(--bg);box-shadow:-14px 0 32px rgba(0,0,0,.55)}   /* выезжающий экран */
 h1{font-size:32px;font-weight:800;margin:6px 0 16px;letter-spacing:-.8px}
@@ -834,7 +838,7 @@ function vCal(){
     if(s.date.indexOf(pre)===0) inMonth++;
   });
   var first=new Date(calM.y,calM.m,1), lead=(first.getDay()+6)%7, days=new Date(calM.y,calM.m+1,0).getDate(), td=today();
-  var h='<div class="card cal"><div class="calhead"><button class="back" data-a="calnav" data-d="-1" aria-label="Предыдущий месяц">'+ic('back')+'</button>'+
+  var h='<div class="swapwrap" id="calwrap"><div class="swapin"><div class="card cal"><div class="calhead"><button class="back" data-a="calnav" data-d="-1" aria-label="Предыдущий месяц">'+ic('back')+'</button>'+
     '<b>'+MONTHS[calM.m]+' '+calM.y+'</b><button class="back" data-a="calnav" data-d="1" aria-label="Следующий месяц">'+ic('chev')+'</button></div>'+
     '<div class="calgrid">'+['Пн','Вт','Ср','Чт','Пт','Сб','Вс'].map(function(x){return '<div class="calwd">'+x+'</div>'}).join('');
   for(var i=0;i<lead;i++) h+='<div></div>';
@@ -845,7 +849,7 @@ function vCal(){
        '<span class="dd">'+ss.slice(0,3).map(function(s){return '<i'+(s.done?'':' class="act"')+'></i>'}).join('')+'</span></button>';
   }
   h+='</div><div class="calsum"><span>'+(inMonth?'Тренировок в месяце: <b>'+inMonth+'</b>':'В этом месяце тренировок нет')+'</span>'+
-     ((calSel!==td||calM.y+'-'+pad(calM.m+1)!==td.slice(0,7))?'<button class="btn sm" data-a="caltoday">Сегодня</button>':'')+'</div></div>';
+     ((calSel!==td||calM.y+'-'+pad(calM.m+1)!==td.slice(0,7))?'<button class="btn sm" data-a="caltoday">Сегодня</button>':'')+'</div></div></div></div>';
   if(calSel){
     var p=calSel.split('-'), sel=(by[calSel]||[]).slice().sort(function(a,b){return a.ts-b.ts});
     h+='<div class="gh">'+(+p[2])+' '+MONTHS_G[+p[1]-1]+(calSel===td?' · сегодня':'')+'</div>';
@@ -856,9 +860,9 @@ function vCal(){
 }
 
 function vHistory(){
-  var h='<h1>История</h1><div class="seg s3"><button class="'+(hseg==='c'?'on':'')+'" data-a="hseg" data-v="c">Календарь</button><button class="'+(hseg==='s'?'on':'')+'" data-a="hseg" data-v="s">Тренировки</button><button class="'+(hseg==='e'?'on':'')+'" data-a="hseg" data-v="e">Упражнения</button></div>';
-  if(hseg==='c') return h+vCal();
-  if(hseg==='s'){
+  var h0='<h1>История</h1><div class="seg s3"><button class="'+(hseg==='c'?'on':'')+'" data-a="hseg" data-v="c">Календарь</button><button class="'+(hseg==='s'?'on':'')+'" data-a="hseg" data-v="s">Тренировки</button><button class="'+(hseg==='e'?'on':'')+'" data-a="hseg" data-v="e">Упражнения</button></div>', h='';
+  if(hseg==='c') h=vCal();
+  else if(hseg==='s'){
     var list=S.sessions.slice().sort(function(a,b){
       var da=a.date||'', db=b.date||'';
       if(da!==db) return da<db?1:-1;
@@ -882,7 +886,7 @@ function vHistory(){
       h+='<button class="item" '+goAttr({t:'ex',name:m.name})+'><div class="title" style="font-size:19px">'+esc(m.name)+'</div><div class="small">тренировок: '+m.count+'</div></button>';
     });
   }
-  return h;
+  return h0+'<div class="swapwrap" id="hwrap"><div class="swapin">'+h+'</div></div>';
 }
 
 function chart(vals){
@@ -1072,9 +1076,10 @@ function viewFor(v){
 }
 
 /* ---------- переходы между экранами как в iOS ---------- */
-// «призрак» — снимок экрана в виде отдельного слоя: при «Назад» он едет поверх, при переходе вперёд остаётся под новым
-var noAnim=false, renderedLen=1, renderedTab='home';
+// «призрак» — снимок экрана в виде отдельного слоя поверх (или под) настоящего
+var noAnim=false, renderedLen=1, renderedTab='home', animTok=0;
 var EASE='cubic-bezier(.22,.8,.24,1)', DUR=340, PAR=26;   // PAR — на сколько % сдвигается нижний экран (параллакс)
+var TABS=['home','history','more'];
 var canAnim=function(){
   var a=document.getElementById('app');
   return !(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)&&!document.hidden&&!!a&&!!a.animate;
@@ -1086,22 +1091,83 @@ function makeGhost(app,cls){
   document.body.appendChild(g);
   return g;
 }
-// переход вперёд: новый экран выезжает справа, прежний сдвигается влево и темнеет
-function pushAnim(g,app){
-  var done=false, fin=function(){
+// общая «уборка» после анимации; tok защищает от запоздавшей уборки, если уже запущена следующая анимация
+function finisher(g,app,tok,cls){
+  var done=false;
+  return function(){
     if(done) return; done=true;
-    if(g.parentNode) g.remove();
-    app.classList.remove('pushing');
-    app.getAnimations().forEach(function(a){a.cancel()});
+    if(g&&g.parentNode) g.remove();
+    if(tok===animTok){
+      if(cls) app.classList.remove(cls);
+      app.getAnimations().forEach(function(a){a.cancel()});
+    }
   };
+}
+// вперёд: новый экран выезжает справа, прежний сдвигается влево и темнеет
+function pushAnim(g,app){
+  var tok=++animTok, fin=finisher(g,app,tok,'pushing');
   app.classList.add('pushing');
   g.animate([{transform:'translateX(0)',opacity:1},{transform:'translateX(-'+PAR+'%)',opacity:.45}],{duration:DUR,easing:EASE,fill:'forwards'});
   var a=app.animate([{transform:'translateX(100%)'},{transform:'none'}],{duration:DUR,easing:EASE});
   a.onfinish=fin; setTimeout(fin,DUR+250);   // страховка: слой не должен остаться на экране
 }
+// назад: старый экран уезжает вправо, из-под него выезжает предыдущий (с затемнением)
+function popAnim(g,app){
+  var tok=++animTok, fin=finisher(g,app,tok);
+  var opt={duration:DUR,easing:EASE};
+  g.animate([{transform:'translateX(0)'},{transform:'translateX(100%)'}],opt).onfinish=fin;
+  app.animate([{transform:'translateX(-'+PAR+'%)',opacity:.45},{transform:'none',opacity:1}],opt);
+  setTimeout(fin,DUR+250);
+}
+// смена вкладки: экраны сдвигаются бок о бок в сторону, зависящую от порядка вкладок
+function tabAnim(g,app,dir){
+  var tok=++animTok, fin=finisher(g,app,tok);
+  var opt={duration:300,easing:EASE};
+  g.classList.add('flat');
+  g.animate([{transform:'translateX(0)'},{transform:'translateX('+(-dir*100)+'%)'}],opt).onfinish=fin;
+  app.animate([{transform:'translateX('+(dir*100)+'%)'},{transform:'none'}],opt);
+  setTimeout(fin,300+250);
+}
+// какая это смена экрана: tab / push / pop / null
+function navKind(oldLen,oldTab){
+  if(nav[0].t!==oldTab) return 'tab';
+  if(nav.length>oldLen) return 'push';
+  if(nav.length<oldLen) return 'pop';
+  return null;
+}
+// содержимое внутри экрана (переключатель «Календарь / Тренировки / Упражнения», месяцы): снимок до и слайд после render()
+function swapSnap(sel){
+  var w=document.querySelector(sel), inn=w&&w.firstElementChild;
+  return inn?inn.innerHTML.replace(/ id="[^"]*"/g,''):null;
+}
+function swapAnim(sel,oldHtml,dir){
+  var w=document.querySelector(sel), inn=w&&w.firstElementChild;
+  if(!inn||oldHtml==null||!canAnim()||!inn.animate) return;
+  Array.prototype.forEach.call(w.querySelectorAll('.swapout'),function(x){x.remove()});
+  var g=document.createElement('div'); g.className='swapout'; g.innerHTML=oldHtml;
+  w.appendChild(g);
+  var opt={duration:300,easing:EASE}, off='calc(100% + 16px)';
+  var done=false, fin=function(){ if(done) return; done=true; if(g.parentNode) g.remove(); inn.getAnimations().forEach(function(a){a.cancel()}); };
+  g.animate([{transform:'translateX(0)'},{transform:'translateX('+(dir>0?'calc(-1 * '+off+')':off)+')'}],opt).onfinish=fin;
+  inn.animate([{transform:'translateX('+(dir>0?off:'calc(-1 * '+off+')')+')'},{transform:'none'}],opt);
+  setTimeout(fin,300+250);
+}
+// закрытие окна итогов: плавное исчезновение
+function fadeOutModal(m){
+  var c=m.cloneNode(true); c.style.animation='none'; c.style.pointerEvents='none';
+  var mc=c.querySelector('.mcard'); if(mc) mc.style.animation='none';
+  c.querySelectorAll('[id]').forEach(function(x){x.removeAttribute('id')});
+  document.body.appendChild(c);
+  var done=false, fin=function(){ if(done) return; done=true; c.remove(); };
+  c.animate([{opacity:1},{opacity:0}],{duration:200,easing:'ease-out'}).onfinish=fin;
+  if(mc) mc.animate([{transform:'none'},{transform:'translateY(10px) scale(.98)'}],{duration:200,easing:'ease-out'});
+  setTimeout(fin,450);
+}
 function render(){
-  var app=document.getElementById('app'), oldLen=renderedLen;
-  var ghost=(!noAnim&&nav.length===oldLen+1&&nav[0].t===renderedTab&&canAnim())?makeGhost(app,'under'):null;   // снимок до подмены содержимого
+  var app=document.getElementById('app'), oldLen=renderedLen, oldTab=renderedTab;
+  var kind=(!noAnim&&canAnim())?navKind(oldLen,oldTab):null;
+  var ghost=kind?makeGhost(app,kind==='push'?'under':''):null;   // снимок до подмены содержимого
+  var oldModal=(!noAnim&&canAnim())?app.querySelector('.modal'):null;
   var html=viewFor(cur());
   if(modal) html+=modalHtml();
   app.innerHTML=html;
@@ -1110,26 +1176,16 @@ function render(){
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'),function(b){b.classList.toggle('on',b.dataset.t===tab)});
   wake(v2.t==='session');
   tick();
-  if(ghost){ if(nav.length===oldLen+1) pushAnim(ghost,app); else ghost.remove(); }
+  if(ghost){
+    if(navKind(oldLen,oldTab)!==kind) ghost.remove();   // экран по дороге перестроился (например, удалённый объект)
+    else if(kind==='push') pushAnim(ghost,app);
+    else if(kind==='pop') popAnim(ghost,app);
+    else tabAnim(ghost,app,TABS.indexOf(tab)>=TABS.indexOf(oldTab)?1:-1);
+  }
+  if(oldModal&&!modal) fadeOutModal(oldModal);
   renderedLen=nav.length; renderedTab=nav[0].t;
 }
 var toTop=function(){window.scrollTo(0,0)};
-// «Назад» по кнопке: старый экран уезжает вправо, из-под него выезжает предыдущий (с затемнением)
-function backAnim(change){
-  var app=document.getElementById('app');
-  if(!canAnim()){change();return;}
-  var g=makeGhost(app);
-  change();
-  var done=false, fin=function(){
-    if(done) return; done=true;
-    if(g.parentNode) g.remove();
-    app.getAnimations().forEach(function(a){a.cancel()});
-  };
-  var opt={duration:DUR,easing:EASE};
-  g.animate([{transform:'translateX(0)'},{transform:'translateX(100%)'}],opt).onfinish=fin;
-  app.animate([{transform:'translateX(-'+PAR+'%)',opacity:.45},{transform:'none',opacity:1}],opt);
-  setTimeout(fin,DUR+250);   // страховка: призрак не должен остаться поверх экрана
-}
 
 // «Назад» свайпом: экран едет за пальцем. Под ним сразу показывается предыдущий экран; отпустили далеко/быстро — уходим, нет — возвращаем
 var pend=null, drag=null;
@@ -1406,15 +1462,21 @@ function markBackup(){
 var A={
   tab:function(d){exq='';nav=[{t:d.t}];render();toTop();},
   go:function(d){exq='';nav.push(JSON.parse(d.v));render();toTop();},
-  back:function(){
-    exq='';
-    var go=function(){if(nav.length>1)nav.pop();render();toTop();};
-    if(nav.length>1) backAnim(go); else go();
+  back:function(){exq='';if(nav.length>1)nav.pop();render();toTop();},   // анимацию «назад» определяет render()
+  hseg:function(d){
+    if(d.v===hseg) return;
+    var order=['c','s','e'], dir=order.indexOf(d.v)>order.indexOf(hseg)?1:-1, snap=swapSnap('#hwrap');
+    hseg=d.v; render(); swapAnim('#hwrap',snap,dir);
   },
-  hseg:function(d){hseg=d.v;render();},
   calday:function(d){calSel=d.d;render();},
-  calnav:function(d){calInit(); var t=new Date(calM.y,calM.m+(+d.d),1); calM={y:t.getFullYear(),m:t.getMonth()}; render();},
-  caltoday:function(){calM=null; calInit(); render();},
+  calnav:function(d){
+    calInit(); var snap=swapSnap('#calwrap'), t=new Date(calM.y,calM.m+(+d.d),1);
+    calM={y:t.getFullYear(),m:t.getMonth()}; render(); swapAnim('#calwrap',snap,+d.d>0?1:-1);
+  },
+  caltoday:function(){
+    calInit(); var snap=swapSnap('#calwrap'), before=calM.y*12+calM.m;
+    calM=null; calInit(); render(); swapAnim('#calwrap',snap,(calM.y*12+calM.m)>=before?1:-1);
+  },
 
   // программы
   padd:function(){
@@ -1713,7 +1775,7 @@ var A={
     var l=S.lib.find(function(x){return x.id===cur().id}); if(!l) return;
     var u=libUse(l); if(u.progs||u.sess) return;
     if(!confirm('Удалить «'+l.name+'» из базы?')) return;
-    S.lib=S.lib.filter(function(x){return x!==l}); save(); backAnim(function(){nav.pop(); render(); toTop();});
+    S.lib=S.lib.filter(function(x){return x!==l}); save(); nav.pop(); render(); toTop();
   },
   exup:function(d){moveEx(d.id,-1);},
   exdown:function(d){moveEx(d.id,1);},
@@ -1727,7 +1789,7 @@ var A={
     if(!confirm('Удалить тренировку вместе с её историей?')) return;
     p.workouts=p.workouts.filter(function(w){return w.id!==v.id});
     S.sessions=S.sessions.filter(function(s){return !(s.programId===p.id&&s.workoutId===v.id)});
-    save(); backAnim(function(){nav.pop(); render(); toTop();});
+    save(); nav.pop(); render(); toTop();
   }
 };
 function moveEx(id,dir){
