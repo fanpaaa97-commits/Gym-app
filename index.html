@@ -24,7 +24,7 @@ body{margin:0;min-height:var(--full,calc(100vh + 2px));overflow-x:hidden;touch-a
 .ghost{position:fixed;inset:0;z-index:8;overflow:hidden;pointer-events:none;will-change:transform;background:radial-gradient(120% 60% at 50% -10%,rgba(200,245,58,.07),transparent 60%) no-repeat,var(--bg);box-shadow:-14px 0 32px rgba(0,0,0,.55)}
 .ghost .gin{max-width:520px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) 16px calc(104px + env(safe-area-inset-bottom))}
 .ghost.under{z-index:-1;box-shadow:none;background:none}   /* уходящий экран под новым при переходе вперёд */
-#app.top{position:relative;min-height:var(--full,100vh);background:radial-gradient(120% 60% at 50% -10%,rgba(200,245,58,.07),transparent 60%) no-repeat,var(--bg);box-shadow:-14px 0 32px rgba(0,0,0,.55)}   /* выезжающий экран */
+#app.pushing{position:relative;min-height:var(--full,100vh);background:radial-gradient(120% 60% at 50% -10%,rgba(200,245,58,.07),transparent 60%) no-repeat,var(--bg);box-shadow:-14px 0 32px rgba(0,0,0,.55)}   /* выезжающий экран */
 h1{font-size:32px;font-weight:800;margin:6px 0 16px;letter-spacing:-.8px}
 .ic{width:1.25em;height:1.25em;flex:none;display:inline-block;vertical-align:-.22em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
 .ic.lg{width:28px;height:28px}
@@ -1091,10 +1091,10 @@ function pushAnim(g,app){
   var done=false, fin=function(){
     if(done) return; done=true;
     if(g.parentNode) g.remove();
-    app.classList.remove('top');
+    app.classList.remove('pushing');
     app.getAnimations().forEach(function(a){a.cancel()});
   };
-  app.classList.add('top');
+  app.classList.add('pushing');
   g.animate([{transform:'translateX(0)',opacity:1},{transform:'translateX(-'+PAR+'%)',opacity:.45}],{duration:DUR,easing:EASE,fill:'forwards'});
   var a=app.animate([{transform:'translateX(100%)'},{transform:'none'}],{duration:DUR,easing:EASE});
   a.onfinish=fin; setTimeout(fin,DUR+250);   // страховка: слой не должен остаться на экране
@@ -1154,7 +1154,7 @@ function dragEnd(cancelled){
   var s0=d.samples.find(function(s){return now-s.t<=120})||d.samples[0];
   var v=(s0&&now>s0.t)?(dx-s0.x)/(now-s0.t):0;       // скорость пальца, px/мс
   var go=!cancelled&&(dx>W*0.38||(v>0.45&&dx>30));
-  var dur=Math.max(150,Math.round(DUR*(go?1-p:p)));
+  var dur=Math.max(230,Math.round(DUR*(go?1-p:p)));   // не короче 230 мс, чтобы доезд не выглядел рывком
   var curT=-PAR*(1-p), curO=.45+.55*p, opt={duration:dur,easing:'cubic-bezier(.25,.8,.3,1)',fill:'forwards'};
   var done=false, fin=function(){
     if(done) return; done=true;
