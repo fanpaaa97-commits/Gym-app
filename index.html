@@ -108,7 +108,20 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .wrow{display:flex;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
 .wn{flex:0 0 42%;max-width:42%;font-size:17px;font-weight:600;word-break:break-word}
 .dots{flex:1;display:flex;flex-wrap:wrap;gap:5px;align-items:center}
-.dots i{display:block;width:11px;height:11px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px rgba(200,245,58,.45)}
+.dots i{display:block;width:11px;height:11px;border-radius:50%;background:var(--c,var(--accent));box-shadow:0 0 8px rgba(var(--cr,200,245,58),.45)}
+.tdot{display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--c,var(--accent));box-shadow:0 0 8px rgba(var(--cr,200,245,58),.5);margin-right:9px;vertical-align:1px}
+.wrowe{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.wrowe .item{flex:1;min-width:0;margin-bottom:0}
+.cdot{flex:none;width:48px;height:48px;border-radius:50%;border:0;padding:0;background:var(--c);box-shadow:inset 0 0 0 3px rgba(255,255,255,.18),0 0 16px rgba(var(--cr),.35);transition:transform .1s}
+.cdot:active{transform:scale(.9)}
+.swgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:18px}
+.swc{aspect-ratio:1;border-radius:50%;border:0;padding:0;background:var(--c);color:#12150a;display:grid;place-items:center;box-shadow:0 0 14px rgba(var(--cr),.3);transition:transform .1s}
+.swc:active{transform:scale(.92)}
+.swc .ic{width:26px;height:26px;stroke-width:3}
+.swc.on{box-shadow:0 0 0 3px var(--card),0 0 0 5px var(--c),0 0 18px rgba(var(--cr),.45)}
+.callg{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:12px;font-size:14px;color:var(--muted)}
+.lgi{display:inline-flex;align-items:center;gap:6px}
+.lgi i{display:block;width:9px;height:9px;border-radius:50%;background:var(--c);box-shadow:0 0 6px rgba(var(--cr),.5)}
 .nodots{color:#4a5163}
 .drow{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
 .gh{color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin:22px 4px 10px}
@@ -234,8 +247,8 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .calday.today{color:var(--accent);font-weight:800}
 .calday.sel{background:var(--card2);box-shadow:inset 0 0 0 2px var(--accent)}
 .dd{display:flex;gap:3px;height:6px}
-.dd i{display:block;width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px rgba(200,245,58,.5)}
-.dd i.act{background:var(--amber);box-shadow:0 0 6px rgba(255,176,46,.5)}
+.dd i{display:block;width:6px;height:6px;border-radius:50%;background:var(--c,var(--accent));box-shadow:0 0 6px rgba(var(--cr,200,245,58),.5)}
+.dd i.act{background:transparent;box-shadow:inset 0 0 0 1.5px var(--c,var(--amber))}   /* незавершённая тренировка — кольцо */
 .calsum{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px;color:var(--muted);font-size:15px}
 .calsum b{color:var(--text)}
 .calsum .btn.sm{min-height:40px;font-size:15px;padding:0 14px}
@@ -292,6 +305,37 @@ var ICONS={
   note:'M5 3h14v18H5zM9 8h6M9 12h6M9 16h3'
 };
 var FILLED={play:1,stop:1,skip:1};
+/* цвета тренировок: хранится ключ в w.color, а в сессии s.color (копия на случай, если тренировку удалят) */
+var PAL=[
+  {k:'lime',n:'Лайм',h:'#c8f53a',r:'200,245,58'},
+  {k:'sky',n:'Небо',h:'#4cc9f0',r:'76,201,240'},
+  {k:'orange',n:'Оранжевый',h:'#ffa62b',r:'255,166,43'},
+  {k:'pink',n:'Розовый',h:'#ff6fb5',r:'255,111,181'},
+  {k:'violet',n:'Фиолетовый',h:'#9b7bff',r:'155,123,255'},
+  {k:'mint',n:'Мята',h:'#2ee6b6',r:'46,230,182'},
+  {k:'red',n:'Красный',h:'#ff6b6b',r:'255,107,107'},
+  {k:'yellow',n:'Жёлтый',h:'#ffe14d',r:'255,225,77'}
+];
+var palBy=function(k){return PAL.find(function(c){return c.k===k})||PAL[0]};
+var colStyle=function(c){return 'style="--c:'+c.h+';--cr:'+c.r+'"'};
+// цвет, который ещё не занят в программе (по кругу, если все заняты)
+function nextColor(p){
+  var used={}; p.workouts.forEach(function(w){if(w.color) used[w.color]=1});
+  var free=PAL.find(function(c){return !used[c.k]});
+  return (free||PAL[p.workouts.length%PAL.length]).k;
+}
+// старым тренировкам без цвета раздаём разные цвета по порядку
+function ensureColors(d){
+  (d.programs||[]).forEach(function(p){
+    var used={};
+    p.workouts.forEach(function(w){if(w.color&&palBy(w.color).k===w.color) used[w.color]=1;});
+    p.workouts.forEach(function(w,i){
+      if(w.color&&used[w.color]) return;
+      var free=PAL.find(function(c){return !used[c.k]});
+      w.color=(free||PAL[i%PAL.length]).k; used[w.color]=1;
+    });
+  });
+}
 function ic(n,c){return '<svg class="ic'+(c?' '+c:'')+'" viewBox="0 0 24 24" aria-hidden="true"'+(FILLED[n]?' style="fill:currentColor"':'')+'><path d="'+ICONS[n]+'"/></svg>'}
 var esc=function(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
 var num=function(n){return String(Math.round(n*100)/100).replace('.',',')};
@@ -343,7 +387,7 @@ function load(){
     var r=localStorage.getItem(KEY);
     if(r){
       var d=JSON.parse(r);
-      if(valid(d)){d=migrate(d);d.settings=d.settings||{rest:90};syncLib(d);return d;}
+      if(valid(d)){d=migrate(d);d.settings=d.settings||{rest:90};syncLib(d);ensureColors(d);return d;}
     }
   }catch(e){}
   return empty();
@@ -669,9 +713,9 @@ function head(title,extra){
   return '<div class="top"><button class="back" data-a="back" aria-label="Назад">'+ic('back')+'</button><h2>'+esc(title)+'</h2>'+(extra||'')+'</div>';
 }
 var goAttr=function(o){return 'data-a="go" data-v="'+esc(JSON.stringify(o))+'"'};
-function dotsHtml(n){
+function dotsHtml(n,col){
   if(!n) return '<span class="nodots">—</span>';
-  return new Array(n+1).join('<i></i>');
+  return new Array(n+1).join('<i '+colStyle(col||PAL[0])+'></i>');
 }
 function chipsHtml(p,withStatus){
   var h='';
@@ -687,7 +731,7 @@ function bail(){
 
 function progCard(p){
   var rows=p.workouts.map(function(w){
-    return '<div class="wrow"><span class="wn">'+esc(w.name)+'</span><span class="dots">'+dotsHtml(doneCount(p,w))+'</span></div>';
+    return '<div class="wrow"><span class="wn">'+esc(w.name)+'</span><span class="dots">'+dotsHtml(doneCount(p,w),palBy(w.color))+'</span></div>';
   }).join('');
   return '<button class="pcard'+(p.current?' cur':'')+((p.run||1)>1?' rep':'')+'" '+goAttr({t:'prog',id:p.id})+'>'+
     '<div class="phead"><div><span class="pname">'+esc(p.name)+'</span>'+(progDates(p)?' <span class="pdates">('+progDates(p)+')</span>':'')+'</div>'+ic('chev','chev')+'</div>'+
@@ -736,8 +780,8 @@ function vProg(v){
   p.workouts.forEach(function(w){
     var n=doneCount(p,w), last=lastDone(p,w);
     var isAct=act&&act.programId===p.id&&act.workoutId===w.id;
-    h+='<div class="card"><div class="title">'+esc(w.name)+'</div>'+
-       '<div class="dots" style="margin:10px 0 6px">'+dotsHtml(n)+'</div>'+
+    h+='<div class="card"><div class="title"><i class="tdot" '+colStyle(palBy(w.color))+'></i>'+esc(w.name)+'</div>'+
+       '<div class="dots" style="margin:10px 0 6px">'+dotsHtml(n,palBy(w.color))+'</div>'+
        '<div class="small nm">'+w.exercises.length+' упр. · сделано раз: '+n+(last?' · последняя '+fmtDate(last):'')+'</div>'+
        (p.current?'<button class="btn primary cta" data-a="start" data-p="'+p.id+'" data-id="'+w.id+'">'+(isAct?'Продолжить':'Начать')+'</button>':'')+
        '</div>';
@@ -826,11 +870,16 @@ function vSession(v){
   return h;
 }
 
+// цвет тренировки в истории: актуальный цвет тренировки в программе, а если её удалили — сохранённый в записи
+function sesCol(s){
+  var w=wkOf({p:s.programId,id:s.workoutId});
+  return palBy((w&&w.color)||s.color);
+}
 function sesItem(s){
   var p=progById(s.programId);
   var n=Object.keys(s.entries).reduce(function(a,k){return a+s.entries[k].sets.length},0);
   var dur=(s.t0&&s.t1)?fmtDurShort(s.t1-s.t0):'';
-  return '<button class="item" data-a="opensession" data-id="'+s.id+'"><div class="title">'+esc(s.name||'Тренировка')+'</div>'+
+  return '<button class="item" data-a="opensession" data-id="'+s.id+'"><div class="title"><i class="tdot" '+colStyle(sesCol(s))+'></i>'+esc(s.name||'Тренировка')+'</div>'+
      '<div class="small">'+fmtDate(s.date)+' · '+n+' подх.'+(dur?' · '+dur:'')+(s.done?'':' · идёт')+(p?' · '+esc(p.name)+((p.run||1)>1?' (повтор '+p.run+')':''):'')+'</div></button>';
 }
 
@@ -859,9 +908,16 @@ function vCal(){
     var ds=pre+pad(d), ss=by[ds]||[];
     h+='<button class="calday'+(ds===td?' today':'')+(ds===calSel?' sel':'')+'" data-a="calday" data-d="'+ds+'"'+
        ' aria-label="'+d+' '+MONTHS_G[calM.m]+(ss.length?', тренировок: '+ss.length:'')+'">'+d+
-       '<span class="dd">'+ss.slice(0,3).map(function(s){return '<i'+(s.done?'':' class="act"')+'></i>'}).join('')+'</span></button>';
+       '<span class="dd">'+ss.slice(0,3).map(function(s){return '<i'+(s.done?'':' class="act"')+' '+colStyle(sesCol(s))+'></i>'}).join('')+'</span></button>';
   }
-  h+='</div><div class="calsum"><span>'+(inMonth?'Тренировок в месяце: <b>'+inMonth+'</b>':'В этом месяце тренировок нет')+'</span>'+
+  // легенда: какие тренировки были в этом месяце и каким цветом они отмечены
+  var lg={}, lgh='';
+  S.sessions.forEach(function(s){
+    if(!s.date||s.date.indexOf(pre)!==0) return;
+    var c=sesCol(s), key=(s.name||'')+'|'+c.k;
+    if(!lg[key]){ lg[key]=1; lgh+='<span class="lgi"><i '+colStyle(c)+'></i>'+esc(s.name||'Тренировка')+'</span>'; }
+  });
+  h+='</div>'+(lgh?'<div class="callg">'+lgh+'</div>':'')+'<div class="calsum"><span>'+(inMonth?'Тренировок в месяце: <b>'+inMonth+'</b>':'В этом месяце тренировок нет')+'</span>'+
      ((calSel!==td||calM.y+'-'+pad(calM.m+1)!==td.slice(0,7))?'<button class="btn sm" data-a="caltoday">Сегодня</button>':'')+'</div></div></div></div>';
   if(calSel){
     var p=calSel.split('-'), sel=(by[calSel]||[]).slice().sort(function(a,b){return a.ts-b.ts});
@@ -983,8 +1039,11 @@ function vPedit(v){
   var h=head('Программа');
   h+='<input class="text" data-in="pname" value="'+esc(p.name)+'" placeholder="Название программы">';
   h+='<div class="gh">Тренировки</div>';
+  if(p.workouts.length) h+='<div class="small" style="margin:0 4px 10px">Нажмите на цветной кружок, чтобы выбрать цвет тренировки.</div>';
   p.workouts.forEach(function(w){
-    h+='<button class="item" '+goAttr({t:'wedit',p:p.id,id:w.id})+'><div class="title">'+esc(w.name)+'</div><div class="small">'+w.exercises.length+' упр.</div></button>';
+    var c=palBy(w.color);
+    h+='<div class="wrowe"><button class="cdot" '+colStyle(c)+' data-a="wcolor" data-id="'+w.id+'" aria-label="Цвет тренировки: '+c.n+'"></button>'+
+       '<button class="item" '+goAttr({t:'wedit',p:p.id,id:w.id})+'><div class="title">'+esc(w.name)+'</div><div class="small">'+w.exercises.length+' упр.</div></button></div>';
   });
   h+='<button class="btn" data-a="wadd">'+ic('plus')+'Добавить тренировку</button><button class="btn danger" style="margin-top:12px" data-a="pdel">Удалить программу</button>';
   return h;
@@ -1226,6 +1285,20 @@ function askConfirm(o){
   d.addEventListener('click',function(e){
     if(e.target.closest('[data-dlg=ok]')){ dlgClose(d); if(o.cb) o.cb(); }
     else if(e.target.closest('[data-dlg=no]')||e.target===d){ dlgClose(d); if(o.no) o.no(); }
+  });
+}
+// выбор цвета: сетка кружков, нажатие сразу применяет и закрывает окно
+function askColor(o){
+  var d=dlgOpen('<div class="title" style="margin-bottom:2px">Цвет тренировки</div>'+
+    '<div class="small" style="margin:0">'+esc(o.title||'')+'</div>'+
+    '<div class="swgrid">'+PAL.map(function(c){
+      var on=c.k===o.cur;
+      return '<button class="swc'+(on?' on':'')+'" '+colStyle(c)+' data-c="'+c.k+'" aria-label="'+c.n+(on?' (выбран)':'')+'">'+(on?ic('check'):'')+'</button>';
+    }).join('')+'</div>','center');
+  d.addEventListener('click',function(e){
+    var b=e.target.closest('[data-c]');
+    if(b){ dlgClose(d); if(b.dataset.c!==o.cur) o.cb(b.dataset.c); }
+    else if(e.target===d) dlgClose(d);
   });
 }
 function askText(o){
@@ -1576,7 +1649,7 @@ var A={
       S.programs.push({
         id:id,name:p.name,current:true,originId:origin,run:run,createdTs:Date.now(),
         workouts:p.workouts.map(function(w){
-          return {id:uid(),name:w.name,exercises:w.exercises.map(function(e){return {id:uid(),name:e.name,step:e.step,tstep:e.tstep,type:e.type}})};
+          return {id:uid(),name:w.name,color:w.color,exercises:w.exercises.map(function(e){return {id:uid(),name:e.name,step:e.step,tstep:e.tstep,type:e.type}})};
         })
       });
       save();
@@ -1603,7 +1676,7 @@ var A={
       if(a2) finishSession(a2);
       var wk=p.workouts.find(function(w){return w.id===d.id});
       if(!wk) return;
-      var ses={id:uid(),programId:p.id,workoutId:wk.id,name:wk.name,date:today(),ts:Date.now(),done:false,entries:{}};
+      var ses={id:uid(),programId:p.id,workoutId:wk.id,name:wk.name,color:wk.color,date:today(),ts:Date.now(),done:false,entries:{}};
       S.sessions.push(ses); save(); openSession(ses.id);
     };
     if(act){
@@ -1808,11 +1881,18 @@ var A={
   import:function(){document.getElementById('file').click();},
 
   // редактор
+  wcolor:function(d){
+    var v=cur(), p=progById(v.id), w=p&&p.workouts.find(function(x){return x.id===d.id});
+    if(!w) return;
+    askColor({title:w.name,cur:w.color,cb:function(k){
+      w.color=k; save(); render();
+    }});
+  },
   wadd:function(){
     var v=cur(), pid=(v.t==='pedit'||v.t==='prog')?v.id:v.p;
     var p=progById(pid); if(!p) return;
     askText({title:'Новая тренировка',hint:'Название, например «Верх А»',ok:'Создать',cb:function(name){
-      var w={id:uid(),name:name,exercises:[]};
+      var w={id:uid(),name:name,color:nextColor(p),exercises:[]};
       p.workouts.push(w); save();
       nav.push({t:'wedit',p:p.id,id:w.id}); render(); toTop();
     }});
@@ -1963,7 +2043,7 @@ document.addEventListener('change',function(e){
       t.value='';
       askConfirm({title:'Заменить данные?',text:'Текущие данные будут заменены данными из файла.',ok:'Заменить',danger:true,cb:function(){
         try{
-          d=migrate(d); d.settings=d.settings||{rest:90}; syncLib(d);
+          d=migrate(d); d.settings=d.settings||{rest:90}; syncLib(d); ensureColors(d);
           d.settings.lastBackup=Date.now(); delete d.settings.bkSnooze;
           S=d; save(); nav=[{t:'home'}]; modal=null; render(); toTop(); toast('Данные загружены');
         }catch(err){toast('Не удалось прочитать файл');}
