@@ -13,15 +13,19 @@
 <link rel="icon" href="icon.png">
 <title>Зал</title>
 <style>
-:root{--bg:#0b0d11;--card:#161920;--card2:#222733;--line:#262c39;--text:#f3f5f9;--muted:#8d95a8;--accent:#c8f53a;--accent-soft:rgba(200,245,58,.12);--on-accent:#12150a;--danger:#ff6b6b;--amber:#ffb02e;--r:20px;--shadow:0 1px 0 rgba(255,255,255,.04) inset,0 8px 24px rgba(0,0,0,.28)}
+:root{--bg:#0b0d11;--card:#161920;--card2:#222733;--line:#262c39;--text:#f3f5f9;--muted:#8d95a8;--accent:#c8f53a;--accent-soft:rgba(200,245,58,.12);--on-accent:#12150a;--ar:200,245,58;--a1:#d4fa56;--a2:#bdee26;--danger:#ff6b6b;--amber:#ffb02e;--r:20px;--shadow:0 1px 0 rgba(255,255,255,.04) inset,0 8px 24px rgba(0,0,0,.28)}
+/* две стороны приложения: Спорт (лайм) и Питание (мята). Призраки при переходе держат цвет своей стороны */
+html.wf,.wf{--accent:#2ee6b6;--accent-soft:rgba(46,230,182,.12);--on-accent:#04150f;--ar:46,230,182;--a1:#5cf0cf;--a2:#22d6a5}
+.ws{--accent:#c8f53a;--accent-soft:rgba(200,245,58,.12);--on-accent:#12150a;--ar:200,245,58;--a1:#d4fa56;--a2:#bdee26}
+.tabsg{z-index:11;pointer-events:none}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html{background:radial-gradient(120% 60% at 50% -10%,rgba(200,245,58,.07),transparent 60%) no-repeat,var(--bg);color-scheme:dark}
+html{background:radial-gradient(120% 60% at 50% -10%,rgba(var(--ar),.07),transparent 60%) no-repeat,var(--bg);color-scheme:dark}
 /* min-height: страница всегда чуть выше экрана (--full задаёт скрипт для iPhone-приложения),
    иначе iOS укорачивает область снизу на коротких экранах и под меню остаётся пробел */
 body{margin:0;min-height:var(--full,calc(100vh + 2px));overflow-x:hidden;touch-action:pan-y;color:var(--text);font:17px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;-webkit-text-size-adjust:100%;overscroll-behavior-y:none}
 #app{max-width:520px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) 16px calc(104px + env(safe-area-inset-bottom))}
 /* «призрак» уходящего экрана при переходе назад */
-.ghost{position:fixed;inset:0;z-index:8;overflow:hidden;pointer-events:none;will-change:transform;background:radial-gradient(120% 60% at 50% -10%,rgba(200,245,58,.07),transparent 60%) no-repeat,var(--bg);box-shadow:-14px 0 32px rgba(0,0,0,.55)}
+.ghost{position:fixed;inset:0;z-index:8;overflow:hidden;pointer-events:none;will-change:transform;background:radial-gradient(120% 60% at 50% -10%,rgba(var(--ar),.07),transparent 60%) no-repeat,var(--bg);box-shadow:-14px 0 32px rgba(0,0,0,.55)}
 .ghost .gin{max-width:520px;margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) 16px calc(104px + env(safe-area-inset-bottom))}
 .modal.dlg{align-items:flex-start;padding-top:calc(env(safe-area-inset-top) + 9vh);z-index:40}   /* окно ввода: у верха, чтобы клавиатура не закрывала */
 .dlg .mcard{max-width:420px}
@@ -36,7 +40,7 @@ body{margin:0;min-height:var(--full,calc(100vh + 2px));overflow-x:hidden;touch-a
 .swapout{position:absolute;left:16px;right:16px;top:0;pointer-events:none}
 #calwrap .card.cal{margin-bottom:0}
 .ghost.under{z-index:-1;box-shadow:none;background:none}   /* уходящий экран под новым при переходе вперёд */
-#app.pushing{position:relative;min-height:var(--full,100vh);background:radial-gradient(120% 60% at 50% -10%,rgba(200,245,58,.07),transparent 60%) no-repeat,var(--bg);box-shadow:-14px 0 32px rgba(0,0,0,.55)}   /* выезжающий экран */
+#app.pushing{position:relative;min-height:var(--full,100vh);background:radial-gradient(120% 60% at 50% -10%,rgba(var(--ar),.07),transparent 60%) no-repeat,var(--bg);box-shadow:-14px 0 32px rgba(0,0,0,.55)}   /* выезжающий экран */
 h1{font-size:32px;font-weight:800;margin:6px 0 16px;letter-spacing:-.8px}
 .ic{width:1.25em;height:1.25em;flex:none;display:inline-block;vertical-align:-.22em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
 .ic.lg{width:28px;height:28px}
@@ -56,7 +60,7 @@ button{touch-action:manipulation;cursor:pointer;-webkit-user-select:none;user-se
 .hide{display:none!important}
 
 .card{background:var(--card);border-radius:var(--r);padding:18px;margin-bottom:14px;box-shadow:var(--shadow)}
-.card.active{box-shadow:inset 0 0 0 2px var(--accent),0 0 32px rgba(200,245,58,.12)}
+.card.active{box-shadow:inset 0 0 0 2px var(--accent),0 0 32px rgba(var(--ar),.12)}
 .title{font-size:21px;font-weight:700}
 .small{color:var(--muted);font-size:15px;margin:2px 0 12px}
 .small.nm{margin-bottom:0}
@@ -64,7 +68,7 @@ button{touch-action:manipulation;cursor:pointer;-webkit-user-select:none;user-se
 .btn{display:flex;align-items:center;justify-content:center;width:100%;border:0;border-radius:16px;min-height:52px;padding:0 16px;background:var(--card2);font-size:17px;font-weight:600;box-shadow:0 1px 0 rgba(255,255,255,.05) inset;transition:transform .08s,filter .12s}
 .btn:active{filter:brightness(1.3);transform:scale(.98)}
 button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.btn.primary{background:linear-gradient(180deg,#d4fa56,#bdee26);color:var(--on-accent);box-shadow:0 1px 0 rgba(255,255,255,.35) inset,0 6px 18px rgba(200,245,58,.18)}
+.btn.primary{background:linear-gradient(180deg,var(--a1),var(--a2));color:var(--on-accent);box-shadow:0 1px 0 rgba(255,255,255,.35) inset,0 6px 18px rgba(var(--ar),.18)}
 .btn.danger{color:var(--danger)}
 .btn.big{min-height:76px;font-size:22px;margin-top:16px}
 .btn.cta{min-height:50px;font-size:17px;margin-top:12px;border-radius:14px}
@@ -76,11 +80,11 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
 
 /* tabs */
-#tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:rgba(17,20,26,.92);-webkit-backdrop-filter:blur(20px) saturate(1.4);backdrop-filter:blur(20px) saturate(1.4);padding:6px 10px calc(6px + env(safe-area-inset-bottom));border-top:1px solid var(--line);z-index:10}
-#tabs button{flex:1;background:none;border:0;min-height:56px;font-size:12px;font-weight:600;letter-spacing:.02em;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transition:color .15s}
-#tabs button .ic{width:26px;height:26px;padding:3px 14px;box-sizing:content-box;border-radius:999px;transition:background .15s,color .15s}
-#tabs button.on{color:var(--accent)}
-#tabs button.on .ic{background:var(--accent-soft)}
+:is(#tabs,.tabsg){position:fixed;left:0;right:0;bottom:0;display:flex;background:rgba(17,20,26,.92);-webkit-backdrop-filter:blur(20px) saturate(1.4);backdrop-filter:blur(20px) saturate(1.4);padding:6px 10px calc(6px + env(safe-area-inset-bottom));border-top:1px solid var(--line);z-index:10}
+:is(#tabs,.tabsg) button{flex:1;background:none;border:0;min-height:56px;font-size:12px;font-weight:600;letter-spacing:.02em;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;transition:color .15s}
+:is(#tabs,.tabsg) button .ic{width:26px;height:26px;padding:3px 14px;box-sizing:content-box;border-radius:999px;transition:background .15s,color .15s}
+:is(#tabs,.tabsg) button.on{color:var(--accent)}
+:is(#tabs,.tabsg) button.on .ic{background:var(--accent-soft)}
 
 /* headers */
 .top{display:flex;align-items:center;gap:10px;margin-bottom:12px}
@@ -94,7 +98,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 /* programs */
 .pcard{display:block;width:100%;text-align:left;border:0;background:var(--card);border-radius:var(--r);padding:18px;margin-bottom:12px;box-shadow:var(--shadow);transition:transform .08s}
 .pcard:active{transform:scale(.985)}
-.pcard.cur{background:linear-gradient(160deg,#1b2612,#141a10 60%);box-shadow:inset 0 0 0 2px var(--accent),0 0 32px rgba(200,245,58,.1)}
+.pcard.cur{background:linear-gradient(160deg,#1b2612,#141a10 60%);box-shadow:inset 0 0 0 2px var(--accent),0 0 32px rgba(var(--ar),.1)}
 .pcard.rep:not(.cur){box-shadow:inset 4px 0 0 var(--amber),var(--shadow)}
 .phead{display:flex;align-items:center;gap:8px}
 .phead>div{flex:1;min-width:0}
@@ -132,7 +136,7 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .gh{color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin:22px 4px 10px}
 
 /* session */
-.restbar{position:sticky;top:calc(6px + env(safe-area-inset-top));z-index:5;background:linear-gradient(180deg,#d4fa56,#bdee26);color:var(--on-accent);border-radius:18px;padding:8px;margin-bottom:12px;font-weight:700;box-shadow:0 10px 28px rgba(0,0,0,.5),0 0 24px rgba(200,245,58,.2)}
+.restbar{position:sticky;top:calc(6px + env(safe-area-inset-top));z-index:5;background:linear-gradient(180deg,var(--a1),var(--a2));color:var(--on-accent);border-radius:18px;padding:8px;margin-bottom:12px;font-weight:700;box-shadow:0 10px 28px rgba(0,0,0,.5),0 0 24px rgba(var(--ar),.2)}
 .restbar.done{background:linear-gradient(180deg,#ffc04d,#ffa414);box-shadow:0 10px 28px rgba(0,0,0,.5),0 0 24px rgba(255,176,46,.25)}
 .rrow{display:flex;align-items:center;gap:8px;padding-left:8px}
 .rrow span{flex:1;font-size:22px;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
@@ -163,13 +167,13 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .sw.on i{left:30px;background:var(--on-accent)}
 
 .ex{scroll-margin-top:90px}
-.ex.open{box-shadow:inset 0 0 0 2px var(--accent),0 0 28px rgba(200,245,58,.1)}
+.ex.open{box-shadow:inset 0 0 0 2px var(--accent),0 0 28px rgba(var(--ar),.1)}
 .exhead{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:0;padding:0}
 .exhead .col{flex:1;min-width:0}
 .exname{display:block;font-size:20px;font-weight:700}
 .exsum{display:block;color:var(--muted);font-size:15px;margin-top:2px}
 .badge{background:var(--card2);border-radius:999px;min-width:38px;height:38px;display:grid;place-items:center;font-weight:800;color:var(--muted)}
-.badge.on{background:var(--accent);color:var(--on-accent);box-shadow:0 0 14px rgba(200,245,58,.35)}
+.badge.on{background:var(--accent);color:var(--on-accent);box-shadow:0 0 14px rgba(var(--ar),.35)}
 .prev{background:var(--card2);border-radius:12px;padding:10px 12px;margin:14px 0 4px;font-size:16px;color:var(--muted)}
 .prev b{color:var(--text)}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
@@ -258,17 +262,13 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .calsum b{color:var(--text)}
 .calsum .btn.sm{min-height:40px;font-size:15px;padding:0 14px}
 
-#toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#f3f5f9;color:#0b0d11;padding:11px 18px;border-radius:999px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .2s;z-index:20;white-space:nowrap}
+#toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#f3f5f9;color:#0b0d11;padding:11px 18px;border-radius:22px;font-weight:700;line-height:1.3;text-align:center;width:max-content;max-width:calc(100vw - 40px);box-shadow:0 8px 24px rgba(0,0,0,.45);opacity:0;pointer-events:none;transition:opacity .2s;z-index:20}
 #toast.on{opacity:1}
 </style>
 </head>
 <body>
 <div id="app"></div>
-<nav id="tabs">
-  <button data-a="tab" data-t="home"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/></svg>Программы</button>
-  <button data-a="tab" data-t="history"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg>История</button>
-  <button data-a="tab" data-t="more"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>Ещё</button>
-</nav>
+<nav id="tabs"></nav>
 <div id="toast"></div>
 <input type="file" id="file" class="hide" accept=".json,application/json">
 
@@ -307,7 +307,9 @@ var ICONS={
   upload:'M12 15V3M7 8l5-5 5 5M5 21h14',
   shield:'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z',
   cal:'M3 5h18v16H3zM3 10h18M8 3v4M16 3v4',
-  note:'M5 3h14v18H5zM9 8h6M9 12h6M9 16h3'
+  note:'M5 3h14v18H5zM9 8h6M9 12h6M9 16h3',
+  utensils:'M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2M7 2v20M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7',
+  apple:'M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06ZM10 2c1 .5 2 2 2 5'
 };
 var FILLED={play:1,stop:1,skip:1};
 /* цвета тренировок: хранится ключ в w.color, а в сессии s.color (копия на случай, если тренировку удалят) */
@@ -1023,6 +1025,25 @@ function vCwords(){
   }
   return h;
 }
+// блок «Резервная копия» показывается в «Ещё» обеих сторон: копия охватывает все данные приложения
+function backupCard(){
+  return '<div class="card"><div class="title ttl">'+ic('shield')+'Резервная копия</div><div class="small">Данные хранятся только на этом телефоне. Приложение напомнит о копии раз в 22 дня (например, сохраните её в «Файлы» или отправьте себе в мессенджер).</div>'+
+    '<div class="small">Защита данных от очистки: <b>'+(persistState==='yes'?'включена':persistState==='no'?'не подтверждена':persistState==='na'?'не поддерживается':'проверяется…')+'</b>'+(persistState==='no'?'. Это не значит, что данные пропадут, но делайте копии регулярно.':'')+'</div>'+
+    '<div class="small">'+(S.settings.lastBackup?'Последняя копия: '+esc(fmtDate(dateOf(S.settings.lastBackup))):'Копия ещё не сохранялась')+'</div>'+
+    '<div class="row2" style="margin-top:0"><button class="btn" data-a="export">'+ic('save')+'Сохранить</button><button class="btn" data-a="import">'+ic('upload')+'Загрузить</button></div></div>';
+}
+// экраны стороны «Питание»: пока заглушки (наполнение — следующие этапы дорожной карты)
+function foodStub(title,icon,head,text){
+  return '<h1>'+title+'</h1><div class="card empty">'+ic(icon)+'<div class="title" style="color:var(--text)">'+head+'</div><div class="small">'+text+'</div></div>';
+}
+function vFood(v){
+  if(v.t==='fday') return foodStub('День','utensils','Здесь будет ваш день','Калории, белки, жиры и углеводы, приёмы пищи. Раздел в разработке.');
+  if(v.t==='fprod') return foodStub('Продукты','apple','База продуктов','Поиск продуктов с калориями и БЖУ, свои продукты, штрихкоды. Раздел в разработке.');
+  if(v.t==='fprog') return foodStub('Прогресс','cal','Календарь, вес и статистика','Дни в цель, график веса, итоги недели и месяца. Раздел в разработке.');
+  return '<h1>Ещё</h1>'+
+    '<div class="card"><div class="title ttl">'+ic('sliders')+'Профиль и цели</div><div class="small">Рост, вес, тип цели и норма калорий и БЖУ появятся здесь. Раздел в разработке.</div></div>'+
+    backupCard();
+}
 function vMore(){
   return '<h1>Ещё</h1>'+
   '<div class="card"><div class="title ttl">'+ic('timer')+'Таймер отдыха</div><div class="small">Запускается после каждого подхода</div><div class="stepper">'+
@@ -1032,10 +1053,7 @@ function vMore(){
   '<div class="card"><div class="title ttl">'+ic('list')+'Упражнения</div><div class="small">Общая база: выбор при добавлении, переименование, объединение дублей.</div>'+
     '<button class="btn" '+goAttr({t:'exlib'})+'>База упражнений · '+S.lib.length+ic('chev','r')+'</button></div>'+
   wordsCard()+
-  '<div class="card"><div class="title ttl">'+ic('shield')+'Резервная копия</div><div class="small">Данные хранятся только на этом телефоне. Приложение напомнит о копии раз в 22 дня (например, сохраните её в «Файлы» или отправьте себе в мессенджер).</div>'+
-    '<div class="small">Защита данных от очистки: <b>'+(persistState==='yes'?'включена':persistState==='no'?'не подтверждена':persistState==='na'?'не поддерживается':'проверяется…')+'</b>'+(persistState==='no'?'. Это не значит, что данные пропадут, но делайте копии регулярно.':'')+'</div>'+
-    '<div class="small">'+(S.settings.lastBackup?'Последняя копия: '+esc(fmtDate(dateOf(S.settings.lastBackup))):'Копия ещё не сохранялась')+'</div>'+
-    '<div class="row2" style="margin-top:0"><button class="btn" data-a="export">'+ic('save')+'Сохранить</button><button class="btn" data-a="import">'+ic('upload')+'Загрузить</button></div></div>';
+  backupCard();
 }
 
 function vPedit(v){
@@ -1148,6 +1166,7 @@ function viewFor(v){
     case 'expick': case 'exlib': return vPick(v);
     case 'exitem': return vExItem(v);
     case 'cwords': return vCwords();
+    case 'fday': case 'fprod': case 'fprog': case 'fmore': return vFood(v);
   }
   return vHome();
 }
@@ -1156,14 +1175,38 @@ function viewFor(v){
 // «призрак» — снимок экрана в виде отдельного слоя поверх (или под) настоящего
 var noAnim=false, renderedLen=1, renderedTab='home', animTok=0;
 var EASE='cubic-bezier(.22,.8,.24,1)', DUR=340, PAR=26;   // PAR — на сколько % сдвигается нижний экран (параллакс)
-var TABS=['home','history','more'];
+/* две стороны: у каждой своё меню и своя «память» о том, где пользователь был */
+var world='sport', tabsWorld=null, worldNav={sport:null,food:null};
+var WT={sport:['home','history','more'],food:['fday','fprod','fprog','fmore']};
+var WHOME={sport:'home',food:'fday'};
+var TABDEF={home:['dumbbell','Программы'],history:['trend','История'],more:['sliders','Ещё'],
+  fday:['utensils','День'],fprod:['apple','Продукты'],fprog:['cal','Прогресс'],fmore:['sliders','Ещё']};
+function tabsHtml(w){
+  return WT[w].map(function(t){return '<button data-a="tab" data-t="'+t+'">'+ic(TABDEF[t][0])+TABDEF[t][1]+'</button>'}).join('');
+}
+function buildTabs(){document.getElementById('tabs').innerHTML=tabsHtml(world); tabsWorld=world;}
+// переключение стороны без анимации (анимацию делает жест). Меню и акцент меняются здесь же.
+function switchWorldRaw(to){
+  if(to===world) return;
+  worldNav[world]=nav; world=to;
+  nav=worldNav[to]||[{t:WHOME[to]}];
+  exq='';
+  document.documentElement.classList.toggle('wf',to==='food');
+}
+function switchWorld(to){
+  if(to===world||modal) return;
+  var was=noAnim; noAnim=true;
+  switchWorldRaw(to); S.settings.world=to; save();
+  render(); window.scrollTo(0,0);
+  noAnim=was;
+}
 var canAnim=function(){
   var a=document.getElementById('app');
   return !(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)&&!document.hidden&&!!a&&!!a.animate;
 };
 function makeGhost(app,cls){
   Array.prototype.forEach.call(document.querySelectorAll('.ghost'),function(x){x.remove()});
-  var g=document.createElement('div'); g.className='ghost'+(cls?' '+cls:'');
+  var g=document.createElement('div'); g.className='ghost'+(cls?' '+cls:'')+(world==='food'?' wf':' ws');
   g.innerHTML='<div class="gin" style="transform:translateY(-'+(window.scrollY||0)+'px)">'+app.innerHTML.replace(/ id="[^"]*"/g,'')+'</div>';
   document.body.appendChild(g);
   return g;
@@ -1250,6 +1293,7 @@ function render(){
   app.innerHTML=html;
   var v2=cur(), tab=nav[0].t;
   document.getElementById('tabs').style.display=(v2.t==='session')?'none':'flex';
+  if(tabsWorld!==world) buildTabs();
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'),function(b){b.classList.toggle('on',b.dataset.t===tab)});
   wake(v2.t==='session');
   tick();
@@ -1257,7 +1301,7 @@ function render(){
     if(navKind(oldLen,oldTab)!==kind) ghost.remove();   // экран по дороге перестроился (например, удалённый объект)
     else if(kind==='push') pushAnim(ghost,app);
     else if(kind==='pop') popAnim(ghost,app);
-    else tabAnim(ghost,app,TABS.indexOf(tab)>=TABS.indexOf(oldTab)?1:-1);
+    else tabAnim(ghost,app,WT[world].indexOf(tab)>=WT[world].indexOf(oldTab)?1:-1);
   }
   if(oldModal&&!modal) fadeOutModal(oldModal);
   renderedLen=nav.length; renderedTab=nav[0].t;
@@ -1375,6 +1419,56 @@ function dragEnd(cancelled){
   }
   setTimeout(fin,dur+250);   // страховка
 }
+// Смена стороны (Спорт ⇄ Питание) свайпом по нижнему меню: экран и меню едут за пальцем бок о бок.
+// Спорт слева, Питание справа: палец влево — в Питание, вправо — обратно в Спорт.
+var wpend=null;
+function makeBarGhost(tabs){
+  Array.prototype.forEach.call(document.querySelectorAll('.tabsg'),function(x){x.remove()});
+  var g=document.createElement('nav'); g.className='tabsg '+(world==='food'?'wf':'ws'); g.innerHTML=tabs.innerHTML;
+  document.body.appendChild(g);
+  return g;
+}
+function wDragStart(x0,dir){
+  var app=document.getElementById('app'), tabs=document.getElementById('tabs'), from=world, to=dir<0?'food':'sport', ys=window.scrollY||0;
+  var g=makeGhost(app,'flat'), gb=makeBarGhost(tabs);
+  noAnim=true; switchWorldRaw(to); render(); window.scrollTo(0,0); noAnim=false;
+  var W=window.innerWidth;
+  drag={kind:'world',g:g,gb:gb,app:app,tabs:tabs,from:from,to:to,dir:dir,ys:ys,W:W,x0:x0,dx:0,fin:false,samples:[]};
+  app.style.transform=tabs.style.transform='translateX('+(-dir*W)+'px)';
+}
+function wDragMove(x){
+  var d=drag, dx=Math.max(0,Math.min(d.W,(x-d.x0)*d.dir))*d.dir, now=Date.now();
+  d.dx=dx;
+  d.g.style.transform=d.gb.style.transform='translateX('+dx+'px)';
+  d.app.style.transform=d.tabs.style.transform='translateX('+(-d.dir*d.W+dx)+'px)';
+  d.samples.push({x:Math.abs(dx),t:now}); if(d.samples.length>8) d.samples.shift();
+}
+function wDragEnd(cancelled){
+  var d=drag; if(!d||d.fin) return; d.fin=true;
+  var now=Date.now(), adx=Math.abs(d.dx), W=d.W, p=adx/W, dir=d.dir;
+  var s0=d.samples.find(function(s){return now-s.t<=120})||d.samples[0];
+  var v=(s0&&now>s0.t)?(adx-s0.x)/(now-s0.t):0;
+  var go=!cancelled&&(adx>W*0.33||(v>0.45&&adx>30));
+  var dur=Math.max(230,Math.round(DUR*(go?1-p:p))), opt={duration:dur,easing:'cubic-bezier(.25,.8,.3,1)',fill:'forwards'};
+  var newFrom=-dir*W+d.dx;
+  var done=false, fin=function(){
+    if(done) return; done=true;
+    if(go){ S.settings.world=d.to; save(); }
+    else { noAnim=true; switchWorldRaw(d.from); render(); window.scrollTo(0,d.ys); noAnim=false; }
+    if(d.g.parentNode) d.g.remove();
+    if(d.gb.parentNode) d.gb.remove();
+    d.app.style.transform=''; d.tabs.style.transform='';
+    d.app.getAnimations().forEach(function(a){a.cancel()});
+    d.tabs.getAnimations().forEach(function(a){a.cancel()});
+    drag=null;
+  };
+  var ghostTo=go?dir*W:0, newTo=go?0:-dir*W;
+  [d.g,d.gb].forEach(function(el){el.animate([{transform:'translateX('+d.dx+'px)'},{transform:'translateX('+ghostTo+'px)'}],opt)});
+  d.tabs.animate([{transform:'translateX('+newFrom+'px)'},{transform:'translateX('+newTo+'px)'}],opt);
+  d.app.animate([{transform:'translateX('+newFrom+'px)'},{transform:'translateX('+newTo+'px)'}],opt).onfinish=fin;
+  setTimeout(fin,dur+250);
+}
+function endDrag(cancelled){ if(!drag) return; if(drag.kind==='world') wDragEnd(cancelled); else dragEnd(cancelled); }
 // Важно: жест может начаться на карточке или кнопке, а при старте жеста экран перерисовывается и этот элемент удаляется.
 // iOS после этого шлёт события движения пальца только удалённому элементу, до document они не доходят (жест «замирал»).
 // Поэтому слушаем события и на самом элементе, где начался жест; одно и то же событие обрабатываем один раз.
@@ -1388,10 +1482,12 @@ function unbindTouch(){
 function onTS(e){
   lastTouchT=Date.now();
   unbindTouch();
-  if(drag){ if(!drag.fin) dragEnd(true); return; }
-  var t=e.touches[0];
-  pend=(e.touches.length===1&&nav.length>1&&!modal&&!e.target.closest('input,textarea,select,.modal'))?{x:t.clientX,y:t.clientY}:null;
-  if(pend){
+  if(drag){ if(!drag.fin) endDrag(true); return; }
+  var t=e.touches[0], onBar=!!e.target.closest('#tabs');
+  var ok=e.touches.length===1&&!modal&&!e.target.closest('input,textarea,select,.modal');
+  pend=(ok&&!onBar&&nav.length>1)?{x:t.clientX,y:t.clientY}:null;          // «назад» — свайп по экрану
+  wpend=(ok&&onBar)?{x:t.clientX,y:t.clientY}:null;                         // смена стороны — свайп по нижнему меню
+  if(pend||wpend){
     tEl=e.target;
     tEl.addEventListener('touchmove',onTM,{passive:false});
     tEl.addEventListener('touchend',onTE,{passive:true});
@@ -1400,9 +1496,26 @@ function onTS(e){
 }
 function onTM(e){
   if(seen(e)) return;
-  if(e.touches.length>1){ if(drag) dragEnd(true); pend=null; return; }
+  if(e.touches.length>1){ if(drag) endDrag(true); pend=null; wpend=null; return; }
   var t=e.touches[0];
-  if(drag){ if(!drag.fin){ if(e.cancelable) e.preventDefault(); dragMove(t.clientX); } return; }
+  if(drag){
+    if(!drag.fin){ if(e.cancelable) e.preventDefault(); (drag.kind==='world'?wDragMove:dragMove)(t.clientX); }
+    return;
+  }
+  if(wpend){
+    if(!canAnim()) return;
+    var wx=t.clientX-wpend.x, wy=t.clientY-wpend.y;
+    if(Math.abs(wy)>10&&Math.abs(wy)>Math.abs(wx)){ wpend=null; unbindTouch(); return; }
+    if(Math.abs(wx)>10&&Math.abs(wx)>Math.abs(wy)*1.2){
+      var dir=wx<0?-1:1;
+      // Спорт → Питание только влево, Питание → Спорт только вправо; в другую сторону ничего не происходит
+      if((world==='sport'&&dir<0)||(world==='food'&&dir>0)){
+        if(e.cancelable) e.preventDefault();
+        wDragStart(wpend.x+dir*10,dir); wDragMove(t.clientX); wpend=null;
+      } else { wpend=null; unbindTouch(); }
+    }
+    return;
+  }
   if(!pend||!canAnim()) return;
   var dx=t.clientX-pend.x, dy=t.clientY-pend.y;
   if(Math.abs(dy)>10&&Math.abs(dy)>Math.abs(dx)){ pend=null; unbindTouch(); return; }      // это вертикальная прокрутка
@@ -1410,23 +1523,32 @@ function onTM(e){
 }
 function onTE(e){
   if(seen(e)) return;
-  var s=pend; pend=null; unbindTouch();
-  if(drag){ dragEnd(false); return; }
-  if(!s||modal||nav.length<2||canAnim()) return;     // без анимации (например «уменьшить движение») — обычный свайп
-  var t=e.changedTouches[0], dx=t.clientX-s.x, dy=t.clientY-s.y;
+  var s=pend, ws=wpend; pend=null; wpend=null; unbindTouch();
+  if(drag){ endDrag(false); return; }
+  if(modal||canAnim()) return;                        // без анимации (например «уменьшить движение») — обычный свайп
+  var t=e.changedTouches[0];
+  if(ws){
+    var wx=t.clientX-ws.x, wy=t.clientY-ws.y;
+    if(Math.abs(wx)>90&&Math.abs(wy)<Math.abs(wx)*0.4){
+      if(world==='sport'&&wx<0) switchWorld('food'); else if(world==='food'&&wx>0) switchWorld('sport');
+    }
+    return;
+  }
+  if(!s||nav.length<2) return;
+  var dx=t.clientX-s.x, dy=t.clientY-s.y;
   if(dx>90&&Math.abs(dy)<dx*0.4) A.back();
 }
 function onTC(e){
   if(seen(e)) return;
-  pend=null; unbindTouch();
-  if(drag) dragEnd(true);
+  pend=null; wpend=null; unbindTouch();
+  if(drag) endDrag(true);
 }
 document.addEventListener('touchstart',onTS,{passive:true});
 document.addEventListener('touchmove',onTM,{passive:false});
 document.addEventListener('touchend',onTE,{passive:true});
 document.addEventListener('touchcancel',onTC,{passive:true});
 // страховка: если жест «потерялся» (события перестали приходить), возвращаем экран на место
-setInterval(function(){ if(drag&&!drag.fin&&Date.now()-lastTouchT>1500) dragEnd(true); },500);
+setInterval(function(){ if(drag&&!drag.fin&&Date.now()-lastTouchT>1500) endDrag(true); },500);
 
 /* ---------- timer / sound / wake ---------- */
 var actx=null, beepAudio=null, audioReady=false, unlocking=false;
@@ -1547,10 +1669,10 @@ document.addEventListener('visibilitychange',function(){
 });
 
 var toastT=null;
-function toast(msg){
+function toast(msg,ms){
   var t=document.getElementById('toast');
   t.textContent=msg; t.classList.add('on');
-  clearTimeout(toastT); toastT=setTimeout(function(){t.classList.remove('on')},1600);
+  clearTimeout(toastT); toastT=setTimeout(function(){t.classList.remove('on')},ms||1600);
 }
 
 /* ---------- session logic ---------- */
@@ -2073,7 +2195,18 @@ function checkPersist(){
   }catch(e){persistState='na';}
 }
 checkPersist();
+// запуск на той стороне, где пользователь был в прошлый раз
+if(S.settings.world==='food'){
+  world='food'; nav=[{t:WHOME.food}]; renderedTab=WHOME.food;
+  document.documentElement.classList.add('wf');
+}
 render();
+// одноразовая подсказка про свайп по меню (показываем один раз, потом никогда)
+setTimeout(function(){
+  if(S.settings.hintWorld||world!=='sport'||modal) return;
+  S.settings.hintWorld=1; save();
+  toast('Проведите по нижнему меню влево, чтобы открыть Питание',4500);
+},1800);
 if('serviceWorker' in navigator&&location.protocol!=='file:'){
   navigator.serviceWorker.register('sw.js').catch(function(){});
 }
