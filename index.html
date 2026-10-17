@@ -1435,6 +1435,7 @@ function render(){
   if(tabsWorld!==world) buildTabs();
   Array.prototype.forEach.call(document.querySelectorAll('#tabs button'),function(b){b.classList.toggle('on',b.dataset.t===tab)});
   wake(v2.t==='session');
+  if(v2.t==='fscan') startScan(); else stopScan();
   tick();
   if(ghost){
     if(navKind(oldLen,oldTab)!==kind) ghost.remove();   // экран по дороге перестроился (например, удалённый объект)
@@ -1453,10 +1454,21 @@ function dlgOpen(inner,cls){
   var d=document.createElement('div'); d.id='dlg'; d.className='modal dlg'+(cls?' '+cls:'');
   d.innerHTML='<div class="mcard">'+inner+'</div>';
   document.body.appendChild(d);
+  // клавиатура iPhone не должна закрывать кнопки: окно подгоняется под видимую область, карточка при нужде прокручивается
+  var vv=window.visualViewport;
+  if(vv){
+    var fit=function(){
+      d.style.top=vv.offsetTop+'px'; d.style.bottom='auto'; d.style.height=vv.height+'px';
+      var mc=d.querySelector('.mcard'); if(mc) mc.style.maxHeight=Math.max(240,vv.height-24)+'px';
+    };
+    vv.addEventListener('resize',fit); vv.addEventListener('scroll',fit); fit();
+    d._unfit=function(){vv.removeEventListener('resize',fit); vv.removeEventListener('scroll',fit);};
+  }
   return d;
 }
 function dlgClose(d){
   if(d._closed) return; d._closed=true;
+  if(d._unfit) d._unfit();
   var a=document.activeElement; if(a&&d.contains(a)&&a.blur) a.blur();
   if(!canAnim()||!d.animate){d.remove();return;}
   d.style.pointerEvents='none';
@@ -2355,7 +2367,7 @@ function askAmount(o){
       d.querySelectorAll('#am-meals [data-m]').forEach(function(x){x.classList.toggle('sel',x.dataset.m===meal)});
     }
   });
-  inp.focus(); try{inp.select()}catch(e){}
+  // клавиатуру сразу не открываем: типичные количества выбираются кнопками, а поле открывается по нажатию
 }
 
 
@@ -3090,9 +3102,207 @@ document.addEventListener('input',function(e){
   else if(k==='fpq'){ fpq=e.target.value; refreshFp(); }
 });
 
-/* Р·Р°РіР»СѓС€РєР° СЃРєР°РЅРµСЂР°: Р·Р°РјРµРЅСЏРµС‚СЃСЏ РІ СЌС‚Р°РїРµ 6 */
-function vFscan(v){return head('РЁС‚СЂРёС…РєРѕРґ')+'<div class="card empty">'+ic('barcode')+'<div class="title" style="color:var(--text)">РЎРєР°РЅРµСЂ</div><div class="small">РЎРєРѕСЂРѕ.</div></div>';}
-A.fscan=function(){toast('РЎРєР°РЅРµСЂ РїРѕСЏРІРёС‚СЃСЏ РІ СЃР»РµРґСѓСЋС‰РµРј РѕР±РЅРѕРІР»РµРЅРёРё');};
+/* ========== ШТРИХКОД: свой декодер EAN-13 / EAN-8 / UPC-A, камера, поиск в Open Food Facts ========== */
+var EAN_L=['3211','2221','2122','1411','1132','1231','1114','1312','1213','3112'].map(function(s){return s.split('').map(Number)});
+var EAN_G=['1123','1222','2212','1141','2311','1321','4111','2131','3121','2113'].map(function(s){return s.split('').map(Number)});
+var EAN_PAR=['LLLLLL','LLGLGG','LLGGLG','LLGGGL','LGLLGG','LGGLLG','LGGGLL','LGLGLG','LGLGGL','LGGLGL'];
+function eanCheck(code){
+  var n=code.length, s=0;
+  for(var i=0;i<n-1;i++) s+=(+code.charAt(i))*(((n-1-i)%2===1)?3:1);     // вес 3 у каждой второй цифры справа от контрольной
+  return (10-s%10)%10===(+code.charAt(n-1));
+}
+// ширины четырёх полос → цифра (L/G/R) с допуском на размытие и перспективу
+function matchDigit(w4,sets){
+  var T=w4[0]+w4[1]+w4[2]+w4[3]; if(T<=0) return null;
+  var n=w4.map(function(x){return x/T*7}), best=null;
+  sets.forEach(function(set){ set.pats.forEach(function(p,d){
+    var e=Math.abs(n[0]-p[0])+Math.abs(n[1]-p[1])+Math.abs(n[2]-p[2])+Math.abs(n[3]-p[3]);
+    if(!best||e<best.e) best={d:d,k:set.k,e:e};
+  }); });
+  return best&&best.e<=1.8?best:null;
+}
+function binarizeLine(g){
+  var n=g.length, W=Math.max(15,Math.round(n/10)), pre=new Float64Array(n+1), bits=new Uint8Array(n), i;
+  for(i=0;i<n;i++) pre[i+1]=pre[i]+g[i];
+  for(i=0;i<n;i++){
+    var a=Math.max(0,i-W), b=Math.min(n,i+W+1), m=(pre[b]-pre[a])/(b-a);
+    bits[i]=g[i]<m*0.94?1:0;       // 1 — тёмный штрих
+  }
+  return bits;
+}
+function runsOf(bits){
+  var runs=[], c=bits[0], len=1;
+  for(var i=1;i<bits.length;i++){ if(bits[i]===c) len++; else { runs.push({c:c,w:len}); c=bits[i]; len=1; } }
+  runs.push({c:c,w:len});
+  return runs;
+}
+function nearUnit(w,u){return w>=u*0.4&&w<=u*2.4}
+function eanFrom(runs,i,left){          // left: 6 для EAN-13, 4 для EAN-8
+  var need=i+3+left*4+5+left*4+3; if(need>runs.length) return null;
+  var pos=i+3, digits=[], par='', k, m, w4, sumL=0;
+  for(k=0;k<left;k++){
+    if(runs[pos].c!==0) return null;
+    w4=[runs[pos].w,runs[pos+1].w,runs[pos+2].w,runs[pos+3].w];
+    m=matchDigit(w4,left===6?[{k:'L',pats:EAN_L},{k:'G',pats:EAN_G}]:[{k:'L',pats:EAN_L}]);
+    if(!m) return null;
+    digits.push(m.d); par+=m.k; sumL+=w4[0]+w4[1]+w4[2]+w4[3]; pos+=4;
+  }
+  var u=sumL/(left*7);
+  if(runs[pos].c!==0) return null;
+  for(k=0;k<5;k++){ if(!nearUnit(runs[pos+k].w,u)) return null; }
+  pos+=5;
+  for(k=0;k<left;k++){
+    if(runs[pos].c!==1) return null;
+    w4=[runs[pos].w,runs[pos+1].w,runs[pos+2].w,runs[pos+3].w];
+    m=matchDigit(w4,[{k:'R',pats:EAN_L}]); if(!m) return null;
+    digits.push(m.d); pos+=4;
+  }
+  var code;
+  if(left===6){ var first=EAN_PAR.indexOf(par); if(first<0) return null; code=[first].concat(digits).join(''); }
+  else code=digits.join('');
+  return eanCheck(code)?code:null;
+}
+function decodeRuns(runs){
+  for(var i=0;i+2<runs.length;i++){
+    if(runs[i].c!==1||runs[i+1].c!==0||runs[i+2].c!==1) continue;
+    var a=runs[i].w, b=runs[i+1].w, c=runs[i+2].w, u=(a+b+c)/3;
+    if(!nearUnit(a,u)||!nearUnit(b,u)||!nearUnit(c,u)) continue;
+    if(i>0&&runs[i-1].w<u*2.5) continue;         // перед кодом должно быть светлое поле
+    var r=eanFrom(runs,i,6)||eanFrom(runs,i,4);
+    if(r) return r;
+  }
+  return null;
+}
+function decodeLine(g){
+  var r=decodeRuns(runsOf(binarizeLine(g)));
+  if(r) return r;
+  var rev=Array.prototype.slice.call(g).reverse();            // код «вверх ногами»
+  return decodeRuns(runsOf(binarizeLine(rev)));
+}
+var scan={stream:null,timer:null,det:null,busy:false,done:false,cv:null,ctx:null};
+function decodeFrame(src){
+  var sw=src.videoWidth||src.width, sh=src.videoHeight||src.height; if(!sw||!sh) return null;
+  var sc=Math.min(1,900/sw), cw=Math.round(sw*sc), ch=Math.round(sh*sc);
+  var cv=scan.cv||(scan.cv=document.createElement('canvas'));
+  if(cv.width!==cw||cv.height!==ch){cv.width=cw;cv.height=ch;scan.ctx=null;}
+  var cx=scan.ctx||(scan.ctx=cv.getContext('2d',{willReadFrequently:true}));
+  cx.drawImage(src,0,0,cw,ch);
+  var y0=Math.round(ch*0.28), y1=Math.round(ch*0.72), step=Math.max(2,Math.round((y1-y0)/18));
+  for(var y=y0;y<=y1;y+=step){
+    var d=cx.getImageData(0,Math.max(0,y-1),cw,3).data, g=new Float32Array(cw);
+    for(var x=0;x<cw;x++){            // среднее по трём строкам: меньше шума
+      var s=0; for(var r=0;r<3;r++){var o=(r*cw+x)*4; s+=d[o]*0.299+d[o+1]*0.587+d[o+2]*0.114;}
+      g[x]=s/3;
+    }
+    var code=decodeLine(g); if(code) return code;
+  }
+  return null;
+}
+
+/* камера */
+var scanCtx={d:null,m:null};
+function setScanMsg(t){var el=document.getElementById('scs'); if(el) el.textContent=t;}
+function stopScan(){
+  if(scan.timer){clearInterval(scan.timer);scan.timer=null;}
+  if(scan.stream){scan.stream.getTracks().forEach(function(t){t.stop()});scan.stream=null;}
+  scan.busy=false;
+}
+function startScan(){
+  var vid=document.getElementById('scv'); if(!vid) return;
+  scan.done=false;
+  if(scan.stream){ vid.srcObject=scan.stream; if(vid.play) vid.play().catch(function(){}); return; }
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){ setScanMsg('Камера недоступна. Введите штрихкод цифрами.'); return; }
+  navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false}).then(function(st){
+    if(cur().t!=='fscan'){ st.getTracks().forEach(function(t){t.stop()}); return; }
+    scan.stream=st;
+    var v=document.getElementById('scv'); if(v){ v.srcObject=st; if(v.play) v.play().catch(function(){}); }
+    if('BarcodeDetector' in window){ try{scan.det=new window.BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e']});}catch(e){scan.det=null;} }
+    scan.timer=setInterval(scanTick,200);
+  }).catch(function(e){
+    setScanMsg(e&&e.name==='NotAllowedError'?'Нет доступа к камере. Разрешите её в настройках iPhone или введите штрихкод цифрами.':'Не удалось включить камеру. Введите штрихкод цифрами.');
+  });
+}
+function scanTick(){
+  if(scan.busy||scan.done) return;
+  var v=document.getElementById('scv'); if(!v||v.readyState<2||!v.videoWidth) return;
+  scan.busy=true;
+  var fin=function(code){scan.busy=false; if(code) onCode(code);};
+  if(scan.det){ scan.det.detect(v).then(function(r){fin(r&&r[0]&&r[0].rawValue)}).catch(function(){scan.det=null;fin(null)}); return; }
+  try{ fin(decodeFrame(v)); }catch(e){ fin(null); }
+}
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='hidden') stopScan();
+  else if(cur().t==='fscan') startScan();
+});
+
+/* поиск продукта по штрихкоду: свои → кэш → Open Food Facts → ввод вручную */
+function onCode(code){
+  if(scan.done) return; scan.done=true;
+  stopScan();
+  try{ if(navigator.vibrate) navigator.vibrate(40); }catch(e){}
+  lookupBarcode(String(code).replace(/\D/g,''));
+}
+function backToScan(){ if(cur().t==='fscan'){ scan.done=false; render(); } }
+function scanAdd(fo,save){
+  var v=cur(), ctx=scanCtx, la=lastOf(fo);
+  askAmount({food:fo,unit:la.u,qty:la.q,meal:ctx.m||mealByTime(),pickMeal:!ctx.m,cb:function(x){
+    var food=fo;
+    if(save&&fo.off) food=saveOffFood(fo);
+    addEntryTo(ctx.d,entryFromFood(x.meal,food,x.g,x.q,x.u));
+    toast('Добавлено: '+fo.n+', '+Math.round(x.g)+' г');
+    if(cur().t==='fscan'){ nav.pop(); render(); toTop(); }
+  }});
+  // закрыли окно без добавления — снова можно сканировать
+  var d=document.getElementById('dlg');
+  if(d) d.addEventListener('click',function(e){ if(e.target.closest('[data-dlg=no]')||e.target===d) setTimeout(backToScan,250); });
+}
+function saveOffFood(fo){
+  var f=F(), ex=f.foods.find(function(x){return x.bc===fo.bc});
+  if(ex) return ex;
+  var o={id:'c'+uid(),n:fo.n,al:[],k:fo.k,p:fo.p,f:fo.f,c:fo.c,por:fo.por||null,bc:fo.bc};
+  f.foods.push(o); save(); return foodById(o.id);
+}
+function notFoundCode(code,name,offline){
+  askConfirm({title:offline?'Нет связи с интернетом':'Продукта нет в базе',text:(offline?'Не удалось проверить штрихкод '+code+' в базе Open Food Facts. ':'Штрихкод '+code+' не найден. ')+'Введите данные с упаковки один раз, и в следующий раз он опознается сам.',ok:'Ввести данные',
+    cb:function(){ customForm({name:name||'',bc:code,after:function(fo){ if(fo) scanAdd(fo,false); }}); setTimeout(function(){var d=document.getElementById('dlg'); if(d) d.addEventListener('click',function(e){ if(e.target.closest('[data-dlg=no]')||e.target===d) setTimeout(backToScan,250); });},0); },
+    no:backToScan});
+}
+function lookupBarcode(code){
+  setScanMsg('Код '+code+'. Ищу продукт…');
+  var my=F().foods.find(function(x){return x.bc===code});
+  if(my){ var fo=foodById(my.id); if(fo){ scanAdd(fo,false); return; } }
+  if(!/^\d{8,14}$/.test(code)){ notFoundCode(code,''); return; }
+  var url='https://world.openfoodfacts.org/api/v2/product/'+code+'.json?fields=product_name,product_name_ru,product_name_uk,brands,nutriments,serving_quantity';
+  fetch(url).then(function(r){return r.json()}).then(function(j){
+    var p=j&&j.status===1&&j.product; if(!p){ notFoundCode(code,''); return; }
+    var n=p.nutriments||{}, name=(p.product_name_uk||p.product_name_ru||p.product_name||'').trim();
+    var brand=(p.brands||'').split(',')[0].trim();
+    var kcal=n['energy-kcal_100g']!=null?+n['energy-kcal_100g']:(n['energy_100g']!=null?+n['energy_100g']/4.184:null);
+    if(!name||kcal==null||isNaN(kcal)){ notFoundCode(code,name); return; }
+    var sv=+p.serving_quantity>0?{l:'порция',g:Math.round(+p.serving_quantity)}:null;
+    scanAdd({id:'o'+code,off:1,bc:code,n:name+(brand&&name.toLowerCase().indexOf(brand.toLowerCase())<0?' ('+brand+')':''),k:Math.round(kcal),p:r1(+n.proteins_100g||0),f:r1(+n.fat_100g||0),c:r1(+n.carbohydrates_100g||0),por:sv,al:[],cat:'my',b:0},true);
+  }).catch(function(){
+    setScanMsg('Нет связи с интернетом. Можно ввести данные вручную.');
+    notFoundCode(code,'',true);
+  });
+}
+function vFscan(){
+  return head('Штрихкод')+
+    '<div class="scan"><video id="scv" playsinline muted autoplay></video><div class="sfr"></div><div class="sln"></div></div>'+
+    '<div class="small" id="scs" style="text-align:center;margin:12px 4px 10px">Наведите камеру на штрихкод упаковки</div>'+
+    '<div class="srch">'+ic('barcode')+'<input class="text" id="scm" inputmode="numeric" autocomplete="off" placeholder="Или введите цифры штрихкода" data-in="scm"></div>'+
+    '<button class="btn cta primary" style="margin-top:0" data-a="fscanmanual">Найти по цифрам</button>';
+}
+A.fscan=function(){
+  var v=cur();
+  scanCtx=v.t==='fadd'?{d:v.d,m:v.m}:{d:fd(),m:null};
+  nav.push({t:'fscan'}); render(); toTop();
+};
+A.fscanmanual=function(){
+  var i=document.getElementById('scm'), code=(i&&i.value||'').replace(/\D/g,'');
+  if(code.length<8){ toast('Введите 8–14 цифр штрихкода'); return; }
+  scan.done=true; stopScan(); lookupBarcode(code);
+};
 
 
 
@@ -3205,7 +3415,8 @@ try{snapPast();}catch(e){}      // прошедшие дни питания фи
 // проверочный вход для самопроверок (только при ?selftest в адресе)
 if(/[?&]selftest/.test(location.search)) window.__t={F:F,S:function(){return S},calcTarget:calcTarget,ratioStatus:ratioStatus,dayStat:dayStat,streak:streak,
   searchFoods:searchFoods,builtinFoods:builtinFoods,fnorm:fnorm,periodStat:periodStat,addEntryTo:addEntryTo,entryFromFood:entryFromFood,setWeight:setWeight,
-  snapPast:snapPast,tOf:tOf,targetFor:targetFor,render:render,save:save,setDate:function(d){fdate=d},foodById:foodById};
+  snapPast:snapPast,tOf:tOf,targetFor:targetFor,render:render,save:save,setDate:function(d){fdate=d},foodById:foodById,
+  decodeLine:decodeLine,decodeFrame:decodeFrame,eanCheck:eanCheck,lookupBarcode:lookupBarcode,onCode:onCode,scanState:scan};
 // запуск на той стороне, где пользователь был в прошлый раз
 if(S.settings.world==='food'){
   world='food'; nav=[{t:WHOME.food}]; renderedTab=WHOME.food;
