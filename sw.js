@@ -1,5 +1,5 @@
 // Офлайн-режим: сначала сеть (чтобы обновления приходили сразу), при отсутствии сети — кэш.
-var V = 'gym-v29';
+var V = 'gym-v30';
 var FILES = ['./', './index.html', './icon.png', './foods.js'];
 
 self.addEventListener('install', function (e) {

@@ -1703,7 +1703,22 @@ setInterval(function(){ if(drag&&!drag.fin&&Date.now()-lastTouchT>1500) endDrag(
 
 /* ========== ПИТАНИЕ: данные и расчёты ========== */
 var MEALS=[{k:'b',n:'Завтрак'},{k:'l',n:'Обед'},{k:'d',n:'Ужин'},{k:'s',n:'Перекус'}];
-var mealName=function(k){var m=MEALS.find(function(x){return x.k===k});return m?m.n:'Приём'};
+// перекусов в дне может быть несколько: ключи 's', 's2', 's3'…; число секций хранится в днях (sn) и не меньше номера последней записи
+function snackCount(ds){
+  var d=F().days[ds], n=(d&&d.sn)||1;
+  if(d) d.e.forEach(function(e){var m=/^s(\d+)$/.exec(e.m); if(m&&+m[1]>n) n=+m[1];});
+  return n;
+}
+function snackName(k,total){var i=k==='s'?1:+k.slice(1); return total>1?'Перекус '+i:'Перекус';}
+function mealsFor(ds){
+  var a=MEALS.slice(0,3), n=snackCount(ds);
+  for(var i=1;i<=n;i++) a.push({k:i===1?'s':'s'+i,n:snackName(i===1?'s':'s'+i,n),rm:i>1&&i===n});
+  return a;
+}
+var mealName=function(k,ds){
+  if(/^s\d*$/.test(k)) return snackName(k,snackCount(ds||fd()));
+  var m=MEALS.find(function(x){return x.k===k}); return m?m.n:'Приём';
+};
 var mealByTime=function(){var h=new Date().getHours();return h<11?'b':h<16?'l':h<21?'d':'s'};
 var ACTS=[
   {k:1.2,n:'Минимальная',t:'Сидячая работа, почти нет тренировок'},
@@ -2035,6 +2050,7 @@ function mealCard(ds,m){
   var ex='';
   if(!es.length&&yes.length) ex+='<button class="btn cta fmx" data-a="fcopy" data-m="'+m.k+'">'+ic('copy')+'Как вчера</button>';
   if(es.length>=2) ex+='<button class="btn cta fmx" data-a="fsavemeal" data-m="'+m.k+'">'+ic('bookmark')+'Сохранить как комбинацию</button>';
+  if(!es.length&&m.rm) ex+='<button class="btn cta fmx" data-a="fsnackdel">'+ic('x')+'Убрать перекус</button>';
   if(!es.length&&!yes.length) h+='<div class="small nm fempty">Пока пусто</div>';
   return h+(ex?'<div class="fmxr">'+ex+'</div>':'')+'</div>';
 }
@@ -2057,7 +2073,8 @@ function vFday(){
   h+='<div class="swapwrap" id="fwkw"><div class="swapin">'+weekStrip(ds)+'</div></div>';
   h+='<div class="swapwrap" id="fdw"><div class="swapin"><div class="gh" style="margin-top:6px">'+longDate(ds)+(ds===td?' · сегодня':'')+'</div>'+
     sumCard(ds);
-  MEALS.forEach(function(m){h+=mealCard(ds,m)});
+  mealsFor(ds).forEach(function(m){h+=mealCard(ds,m)});
+  h+='<button class="btn cta" style="margin:-2px 0 14px" data-a="fsnack">'+ic('plus')+'Добавить ещё перекус</button>';
   return h+waterCard(ds)+weightCard(ds)+'</div></div>';
 }
 
@@ -2093,7 +2110,7 @@ function fsBody(){
 }
 function refreshFs(){var el=document.getElementById('fslist'); if(el) el.innerHTML=fsBody();}
 function vFadd(v){
-  return head(mealName(v.m)+' · '+shortDate(v.d))+
+  return head(mealName(v.m,v.d)+' · '+shortDate(v.d))+
     '<div class="srch">'+ic('search')+'<input class="text" id="fsq" data-in="fsq" autocomplete="off" autocapitalize="none" placeholder="Продукт: овсянка, курица, яблоко" value="'+esc(fsq)+'"></div>'+
     '<div class="row2" style="margin:0 0 4px"><button class="btn cta" style="margin-top:0" data-a="fscan">'+ic('barcode')+'Штрихкод</button>'+
     '<button class="btn cta" style="margin-top:0" data-a="fquick">'+ic('zap')+'Быстрый ввод</button></div>'+
@@ -2326,7 +2343,7 @@ function askAmount(o){
     '<div class="amrow"><input class="text amt" id="am-q" inputmode="decimal" autocomplete="off" value="'+num(qty)+'"><span class="amu" id="am-u"></span></div>'+
     '<div class="chips amch" id="am-ch"></div>'+
     '<div class="apv" id="am-pv"></div>'+
-    (o.pickMeal?'<div class="lbl" style="margin-top:12px">Приём пищи</div><div class="chips" id="am-meals">'+MEALS.map(function(m){return '<button class="chip'+(m.k===meal?' sel':'')+'" data-m="'+m.k+'">'+m.n+'</button>'}).join('')+'</div>':'')+
+    (o.pickMeal?'<div class="lbl" style="margin-top:12px">Приём пищи</div><div class="chips" id="am-meals">'+(o.meals||mealsFor(fd())).map(function(m){return '<button class="chip'+(m.k===meal?' sel':'')+'" data-m="'+m.k+'">'+m.n+'</button>'}).join('')+'</div>':'')+
     '<div class="row2"><button class="btn cta" data-dlg="no">Отмена</button><button class="btn primary cta" data-dlg="ok">'+esc(o.ok||'Добавить')+'</button></div>'+
     (o.del?'<button class="btn cta dnt" data-dlg="del" style="margin-top:10px">Удалить запись</button>':'');
   var d=dlgOpen(inner,'hi'), inp=d.querySelector('#am-q'), okb=d.querySelector('[data-dlg=ok]');
@@ -2986,7 +3003,7 @@ Object.assign(A,{
     var e=r.e, ds=r.ds;
     var del=function(){ var dd=F().days[ds]; dd.e=dd.e.filter(function(x){return x.id!==e.id}); save(); render(); };
     if(e.per){
-      askAmount({food:{n:e.n,k:e.per.k,p:e.per.p,f:e.per.f,c:e.per.c,por:e.por||null},unit:e.u,qty:e.q,meal:e.m,pickMeal:true,ok:'Сохранить',del:true,onDel:del,
+      askAmount({food:{n:e.n,k:e.per.k,p:e.per.p,f:e.per.f,c:e.per.c,por:e.por||null},unit:e.u,qty:e.q,meal:e.m,pickMeal:true,meals:mealsFor(ds),ok:'Сохранить',del:true,onDel:del,
         cb:function(x){ var ne=entryFromFood(x.meal,{n:e.n,k:e.per.k,p:e.per.p,f:e.per.f,c:e.per.c,por:e.por,id:e.fid},x.g,x.q,x.u); e.m=ne.m;e.g=ne.g;e.q=ne.q;e.u=ne.u;e.k=ne.k;e.p=ne.p;e.f=ne.f;e.c=ne.c; save(); render(); }});
     } else {
       askForm({title:'Запись',text:mealName(e.m),fields:[{k:'n',l:'Название',t:'t',v:e.n},{k:'k',l:'Калории',t:'n',u:'ккал',v:e.k,req:true},{k:'p',l:'Белки',t:'n',u:'г',v:e.p,z:1},{k:'f',l:'Жиры',t:'n',u:'г',v:e.f,z:1},{k:'c',l:'Углеводы',t:'n',u:'г',v:e.c,z:1}],
@@ -3079,6 +3096,19 @@ Object.assign(A,{
     else if(d.k==='tol') f.tol=clampN(f.tol+dir,3,20);
     else if(d.k==='bonus') g.bonus=clampN((g.bonus||0)+50*dir,0,500);
     save(); render();
+  }
+});
+Object.assign(A,{
+  fsnack:function(){
+    var ds=fd(), d=dayOf(ds,true), n=snackCount(ds);
+    if(n>=8){ toast('Максимум 8 перекусов в день'); return; }
+    d.sn=n+1; save(); render();
+    toast('Добавлен: '+snackName('s'+(n+1),n+1));
+  },
+  fsnackdel:function(){
+    var ds=fd(), d=dayOf(ds,true), n=snackCount(ds), key='s'+n;
+    if(n<=1||d.e.some(function(e){return e.m===key})) return;      // удалять можно только пустой последний перекус
+    d.sn=n-1; save(); render();
   }
 });
 // поля ввода профиля и цели: сохраняем при потере фокуса
