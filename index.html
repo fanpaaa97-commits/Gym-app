@@ -366,12 +366,13 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline
 .calday .rgw b{font-size:16px;font-weight:600}
 .calday.today .rgw b{color:var(--accent);font-weight:800}
 .calday.sel{box-shadow:inset 0 0 0 2px var(--accent)}
-i.pd{display:block;width:6px;height:6px;border-radius:50%;box-shadow:inset 0 0 0 1.5px #4cc9f0;background:transparent}
-i.pd.on{background:#4cc9f0;box-shadow:0 0 5px rgba(76,201,240,.5)}
-i.wk{display:block;width:6px;height:6px;border-radius:2px;background:var(--c,#8d95a8)}
-.lgi i.pd,.lgi i.wk{width:8px;height:8px;box-shadow:inset 0 0 0 1.5px #4cc9f0}
+/* белок — нейтральный белый кружок, тренировка — цветная «таблетка»: формы и цвета не путаются */
+i.pd{display:block;width:6px;height:6px;border-radius:50%;box-shadow:inset 0 0 0 1.5px rgba(243,245,249,.5);background:transparent}
+i.pd.on{background:#f3f5f9;box-shadow:none}
+i.wk{display:block;width:11px;height:4px;border-radius:2px;background:var(--c,#8d95a8);box-shadow:none}
+.lgi i.pd{width:8px;height:8px;box-shadow:inset 0 0 0 1.5px rgba(243,245,249,.5)}
 .lgi i.pd.on{box-shadow:none}
-.lgi i.wk{box-shadow:none}
+.lgi i.wk{width:14px;height:5px;box-shadow:none}
 .lgi i.rd{width:11px;height:11px;border-radius:50%;background:transparent;box-shadow:none;border:2.5px solid}
 .lgi i.rd.rh{border-color:var(--accent)}
 .lgi i.rd.rn{border-color:#ffb02e}
@@ -2194,7 +2195,7 @@ function vFcal(){
       '<span class="rgw">'+(st.has&&st.t?ring(st.pct,stCls(st.st)):(st.has?'<i class="hd"></i>':''))+'<b>'+d+'</b></span><span class="dd">'+dots+'</span></button>';
   }
   h+='</div><div class="callg"><span class="lgi"><i class="rd rh"></i>в цели</span><span class="lgi"><i class="rd rn"></i>почти</span><span class="lgi"><i class="rd rm"></i>мимо</span>'+
-    '<span class="lgi"><i class="pd on"></i>белок</span><span class="lgi"><i class="wk" style="--c:#8d95a8"></i>тренировка</span></div>'+
+    '<span class="lgi"><i class="pd on"></i>норма белка</span><span class="lgi"><i class="wk" style="--c:#8d95a8"></i>тренировка</span></div>'+
     '<div class="calsum"><span>'+(ps.done?'Дней в цель: <b>'+ps.hit+'</b> из <b>'+ps.done+'</b>':'В этом месяце пока нет оценённых дней')+'</span>'+
     ((fcalSel!==td||fcalM.y+'-'+pad(fcalM.m+1)!==td.slice(0,7))?'<button class="btn sm" data-a="fcaltoday">Сегодня</button>':'')+'</div>'+
     '<div class="callg" style="margin-top:8px">'+(streak()?'<span>Серия: <b style="color:var(--text)">'+streak()+'</b> дн.</span>':'')+
